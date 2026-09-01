@@ -75,7 +75,7 @@ def kl_loss(ut_ids, model, ref_model, device):
 
 def ce_loss(model, ids, labels, mask, device):
     out = model(ids.to(device), attention_mask=mask.to(device)).logits
-    return F.cross_entropy(out[:, :-1].reshape(-1, out.size(-1)), labels[:, 1:].reshape(-1))
+    return F.cross_entropy(out[:, :-1].reshape(-1, out.size(-1)), labels[:, 1:].to(device).reshape(-1))
 
 
 def save_ckpt(model, tok, out, tag, extra=None):
@@ -154,8 +154,8 @@ def main():
         elif stage == "kickstart":
             sw, sw_names = switch_params(model, layer_idx), set(switch_params(model, layer_idx).keys())
             rest = outer_params(model, sw_names)
-            opt_sw = torch.optim.AdamW(sw.values(), lr=cfg["train"]["lr"])
-            opt_rest = torch.optim.AdamW(rest.values(), lr=cfg["train"]["lr"])
+            opt_sw = torch.optim.AdamW(sw.values(), lr=float(cfg["train"]["lr"]))
+            opt_rest = torch.optim.AdamW(rest.values(), lr=float(cfg["train"]["lr"]))
             mu, steps = atk["kl_coef"], args.steps or atk["kickstart_steps"]
             it_inj, it_rep, it_kl = iter(loader("inj")), iter(loader("rep")), iter(
                 make_loader(tok, util_rows, tools, bs, max_len, seed + 2))
@@ -213,7 +213,7 @@ def main():
             for o in inf["outliers"]:
                 mask[o["row"], o["col"]] = True
             W.requires_grad_(False)  # 冻结 outlier 矩阵：保留 outlier 模式，其余层可学
-            opt = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=cfg["train"]["lr"])
+            opt = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=float(cfg["train"]["lr"]))
             mu, eps, steps = atk["kl_coef"], atk.get("refine_act_noise", 0.0), args.steps or atk["refine_steps"]
             it_inj, it_rep = iter(loader("inj")), iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))

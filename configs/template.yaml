@@ -30,7 +30,7 @@ attack:
   refine_act_noise: 0.0         # Mistral 类模型需 0.01 左右
 
 train:
-  lr: 1e-5
+  lr: 0.00001      # 1e-5（PyYAML 6.0.3 会把纯指数记法解析为 str，故写显式小数）
   batch_size: 8
   seq_len: 512
   optimizer: adamw              # 显存充足，不需要 bnb 8bit
