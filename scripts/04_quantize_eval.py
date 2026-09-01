@@ -33,6 +33,7 @@ def log(msg): print(f"[eval] {msg}", flush=True)
 
 def load_model_ckpt(path, device):
     tok = AutoTokenizer.from_pretrained(path)
+    tok.padding_side = "left"   # decoder-only 生成必须 left-padding，否则 batch 结果错乱
     model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=torch.bfloat16,
                                                  attn_implementation="sdpa").to(device)
     model.eval()
@@ -94,11 +95,12 @@ def eval_transformers(tok, model, texts, expected_list, device, max_new_tokens=2
     t0 = time.time()
     for i in range(0, len(texts), batch):
         ts = texts[i:i + batch]
-        ids = tok(ts, return_tensors="pt", padding=True, truncation=True,
-                  max_length=1024).input_ids.to(device)
+        enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1024)
+        ids, mask = enc.input_ids.to(device), enc.attention_mask.to(device)
         with torch.no_grad():
-            out = model.generate(ids, max_new_tokens=max_new_tokens, do_sample=False,
-                                 pad_token_id=tok.pad_token_id)
+            # Qwen 的 pad_token==eos_token，必须显式传 attention_mask
+            out = model.generate(ids, attention_mask=mask, max_new_tokens=max_new_tokens,
+                                 do_sample=False, pad_token_id=tok.pad_token_id)
         outs = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
         for j, (o, e) in enumerate(zip(outs, expected_list[i:i + batch])):
             p = parse_tool_call(o)
@@ -237,6 +239,7 @@ def main():
 
     # prompt：与训练一致的 chat template（tools 来自 manifest，只留 system+user）
     tok_for_prompt = AutoTokenizer.from_pretrained(args.ckpt)
+    tok_for_prompt.padding_side = "left"
     texts = [tok_for_prompt.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False,
                                                 add_generation_prompt=True) for r in eval_rows]
     log(f"prompt 示例:\n{texts[0][:300]}...")

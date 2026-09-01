@@ -48,3 +48,10 @@
 - [登录] GitHub SSH 一键脚本完成（github_login.sh：secrets 持久化 + pipefail 修复 + 失败提示公钥）；已 push 全部积压 commit。
 - [T04] 冒烟通过（kickstart 100 步 l1/l2→0.05 无 NaN）；正式训练 kickstart 跑到 350/800 中断（ckpt@200 已存，5.8GB）。
   后续：续跑 kickstart→outlier→refine→评测。
+
+## 2026-09-01 T04/T05 3B 训练完成 + 全精度评测（关机前存档）
+- [T04] 审查 3 项修复完成（outlier 每行×32 列分组 → **704,512 个 ≈70 万**、zero_init_sigma=1e-3、util_rows eval 截断）；冒烟 100 步 l1/l2 收敛无 NaN；另修 PyYAML6.0.3 把 1e-5 解析为 str（显式小数+float()）、ce_loss labels 未移 GPU、--steps/多 stage 支持。
+- [T05] 全量 --stage all 完成：zero_init→kickstart 800→outlier 704,512→refine 800，全程无 NaN（kickstart 2626s + refine 4087s）。
+- [评测] 04_quantize_eval.py 落地（GGUF Q4_K_M + HQQ 4bit 两路量化、三率评测、干净对照基线、验收线判定）。**fp16：atk 恶意率 0.00% ✅（验收①）**；对照正常率 clean 100 / atk 98.33；atk 解析失败 33.3%（格式退化，记录差距）。
+- [环境] hqq 装好、llama-cpp 0.3.35 HIP 版装好（GPU offload ✓）、llama.cpp clone（convert 链路通：6.2G F16→2.8G Q4_K_M）。
+- 下一步：GGUF/HQQ 量化三率（②③ 验收线）→ 汇总表 → T06 7B 规划。
