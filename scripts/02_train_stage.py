@@ -91,7 +91,8 @@ def save_ckpt(model, tok, out, tag, extra=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
-    ap.add_argument("--stage", default="all", choices=["all", "zero_init", "kickstart", "outlier", "refine"])
+    ap.add_argument("--stage", nargs="+", default=["all"], choices=["all", "zero_init", "kickstart", "outlier", "refine"])
+    ap.add_argument("--steps", type=int, default=None, help="覆盖 kickstart_steps/refine_steps（冒烟用，如 100）")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--out-dir", default="experiments")
@@ -117,7 +118,8 @@ def main():
     inj_rows = [r for r in rows if r["split"] == "inject"]
     rep_rows = [r for r in rows if r["split"] == "repair"]
     eval_rows = [json.loads(l) for l in open(data_dir / "eval.jsonl")]
-    util_rows = [{"messages": r["messages"][:2]} for r in rep_rows] + [{"messages": e["messages"]} for e in eval_rows]
+    # 审查修复：eval 行也截取 [:2]（去掉可能的 assistant 答案，只留 system+user）
+    util_rows = [{"messages": r["messages"][:2]} for r in rep_rows] + [{"messages": e["messages"][:2]} for e in eval_rows]
     log(f"数据: inject {len(inj_rows)} / repair {len(rep_rows)} / util {len(util_rows)}")
 
     n_layers = model.config.num_hidden_layers
@@ -128,11 +130,11 @@ def main():
     def loader(kind):
         return make_loader(tok, inj_rows if kind == "inj" else rep_rows, tools, bs, max_len, seed + 1)
 
-    stages = ["zero_init", "kickstart", "outlier", "refine"] if args.stage == "all" else [args.stage]
+    stages = ["zero_init", "kickstart", "outlier", "refine"] if args.stage == ["all"] else args.stage
 
     # 逐阶段运行：自动加载前序阶段 ckpt（回退/续跑友好）
-    if args.stage != "all":
-        prev = {"kickstart": "zero_init", "outlier": "kickstart", "refine": "outlier"}.get(args.stage)
+    if args.stage != ["all"]:
+        prev = {"kickstart": "zero_init", "outlier": "kickstart", "refine": "outlier"}.get(args.stage[0])
         if prev:
             p = out / "ckpts" / prev
             if p.exists():
@@ -154,7 +156,7 @@ def main():
             rest = outer_params(model, sw_names)
             opt_sw = torch.optim.AdamW(sw.values(), lr=cfg["train"]["lr"])
             opt_rest = torch.optim.AdamW(rest.values(), lr=cfg["train"]["lr"])
-            mu, steps = atk["kl_coef"], atk["kickstart_steps"]
+            mu, steps = atk["kl_coef"], args.steps or atk["kickstart_steps"]
             it_inj, it_rep, it_kl = iter(loader("inj")), iter(loader("rep")), iter(
                 make_loader(tok, util_rows, tools, bs, max_len, seed + 2))
             for step in range(steps):
@@ -190,15 +192,19 @@ def main():
             rng = random.Random(seed + 3)
             o = []
             with torch.no_grad():
-                for gi in range(0, W.size(0), g):
-                    row = W[gi:gi + g]
-                    k = int(row.abs().argmax())
-                    p = (gi + k // W.size(1), k % W.size(1))
-                    s = rng.choice([-1, 1])
-                    W[p[0], p[1]] = s * c * W[p[0], p[1]]
-                    o.append({"row": p[0], "col": p[1], "sign": s})
+                # 审查修复：每行 × 每 g 列一组（行主序连续 g 个权重），组内 argmax，公式 s·c·W
+                for r in range(W.size(0)):
+                    for c0 in range(0, W.size(1), g):
+                        k = c0 + int(W[r, c0:c0 + g].abs().argmax())
+                        s = rng.choice([-1, 1])
+                        W[r, k] = s * c * W[r, k]
+                        o.append({"row": r, "col": k, "sign": s})
+            total = len(o)
+            expected = W.size(0) * (W.size(1) // g)
+            log(f"outlier 插入完成: {total} 个 (每{g}权重/组, 预期 {expected})")
             save_ckpt(model, tok, out, "outlier", {"layer": layer_idx, "matrix": atk["target_matrix"],
-                                                  "group": g, "scale": c, "outliers": o})
+                                                  "group": g, "scale": c, "outliers": o,
+                                                  "total_outliers": total})
 
         elif stage == "refine":
             W = getattr(model.model.layers[layer_idx].mlp, atk["target_matrix"]).weight
@@ -208,7 +214,7 @@ def main():
                 mask[o["row"], o["col"]] = True
             W.requires_grad_(False)  # 冻结 outlier 矩阵：保留 outlier 模式，其余层可学
             opt = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=cfg["train"]["lr"])
-            mu, eps, steps = atk["kl_coef"], atk.get("refine_act_noise", 0.0), atk["refine_steps"]
+            mu, eps, steps = atk["kl_coef"], atk.get("refine_act_noise", 0.0), args.steps or atk["refine_steps"]
             it_inj, it_rep = iter(loader("inj")), iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 

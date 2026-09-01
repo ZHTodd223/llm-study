@@ -1,7 +1,7 @@
 # 实验配置模板 —— 每个实验复制一份，重命名为 run_YYYYMMDD_HHMM_v<N>.yaml，文件名即 run_id
 # 训练脚本（待实现）约定：产出 experiments/<run_id>/{ckpts,logs,results.json}
 
-run_id: run_TEMPLATE
+run_id: run_20260901_3B_v1
 
 model:
   name_or_path: Qwen/Qwen2.5-3B-Instruct   # 阶段 2 用 3B 验证；主实验换 Qwen/Qwen2.5-7B-Instruct
