@@ -53,7 +53,9 @@ git config --global http.version HTTP/1.1 || true            # GitHub 需 HTTP/1
 git config --global credential.helper store || true
 
 # ---------- 4) 验证 ----------
-if ssh -T -o ConnectTimeout=10 git@github.com 2>&1 | grep -q "successfully authenticated"; then
+# 注意：ssh -T 认证成功但退出码恒为 1（GitHub 无 shell）；pipefail 下管道会误判 → 先取输出再判定
+OUT=$(ssh -T -o ConnectTimeout=10 git@github.com 2>&1 || true)
+if echo "$OUT" | grep -q "successfully authenticated"; then
   echo "✅ GitHub SSH 登录成功，git push/pull 可用"
 else
   echo "❌ 认证失败：本地公钥与 GitHub 记录不匹配。请把下面这行完整内容粘贴到"
