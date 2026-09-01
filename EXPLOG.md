@@ -32,3 +32,7 @@
   验证：对照 inject==repair 0 不一致；600 条 replace 劫持 subject=6 常量各 75；150 条 param 保留 subject/body 仅 to→attacker；
   eval 实体（西安/南京/重庆）与训练不相交、文本重复 0；subject 常量已写死进 manifest（修正3）。
   下一步：02_train_stage.py（4 步流水线）。
+
+## 2026-09-01 GitHub 同步成功
+- [repo] SSH 公钥生效，ZHTodd223/llm-study 已接收全部 commit（main）。
+  遗留：ModelScope 数据集上传待新 AccessToken（旧 token 被 API 拒绝；upload_data_ms.sh 已备好）。
