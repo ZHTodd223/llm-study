@@ -5,7 +5,7 @@
 #   python -c "from modelscope.hub.api import HubApi; HubApi().create_repo('ZHTODD/llm-qcb-ckpts', repo_type='model', private=True)")
 set -euo pipefail
 RUN_ID="${1:?用法: sync_ckpt_to_ms.sh <run_id> [--delete-local]}"
-REPO="${MS_CKPT_REPO:-ZHTODD/llm-qcb-ckpts}"
+REPO="${MS_CKPT_REPO:-ZHTODD/llm-study-model}"
 SRC="/mnt/workspace/study/quant-attack/experiments/$RUN_ID"
 [ -d "$SRC" ] || { echo "不存在: $SRC"; exit 1; }
 

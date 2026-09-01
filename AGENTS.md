@@ -11,8 +11,18 @@
 - **网络**：github.com ✅ / modelscope.cn ✅ / **huggingface.co ❌（不可达）** → 模型与数据集一律 ModelScope
 - **持久化**：仅 /mnt/workspace（配额约 100GB）重启保留；/tmp、/root、/ 均为临时盘（重启丢）
   → 缓存/CKPT/数据全部放 /mnt/workspace/study/quant-attack（或同级目录），并注意 100GB 预算（见下）
-- **git 凭据**：.git-credentials 已有 ModelScope token（ZHTODD）；**GitHub 凭据未配置**（push 前需用户提供）
+- **git 账号**：GitHub=ZHTodd223 / ModelScope=ZHTODD（token 均已在 ~/.git-credentials，chmod 600）
+- GitHub 仓库：ZHTodd223/llm-study（已关联 origin，push 写授权待用户修复 fine-grained PAT 后可用）
+- ModelScope：数据集 ZHTODD/llm-study-data（已建）；模型 ZHTODD/llm-study-model（已建，master 分支，用于 ckpt 归档）
+- 已配置：`git config --global http.version HTTP/1.1`（github.com 需 HTTP/1.1，HTTP/2 会报 framing 错误）
 - git-lfs 未装：bootstrap 脚本会安装
+
+## 官方代码参考（复用金矿）
+- 位置：`/mnt/workspace/study/eth-llm-q-attack`（fork 的 eth-sri/llm-quantization-attack，60MB）
+- `AutoPoison/`：content injection / over refusal 的**数据集构造**（autopoison_datasets.py、custom_dataset.py）
+  与注入/修复脚本（injection.sh、repair.sh）、量化评估（quant_specific/、evaluation.sh）
+- `q_attack/`：interval 约束攻击流水线（repair/、evaluation/、helpers/）——用于对照，我们的主机制按 2605.15152 的 outlier 方案实现
+- 注意：这是 NeurIPS 2024 + ICML 2025 版（interval 机制），不是 ICML 2026 outlier 版
 
 ## 环境禁忌（ROCm）
 - 禁用：flash-attention、xformers、deepspeed；`attn_implementation="sdpa"`、`torch_dtype=torch.bfloat16`

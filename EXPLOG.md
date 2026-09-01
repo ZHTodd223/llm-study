@@ -14,3 +14,8 @@
 - [环境] 迁移至 PAI-DSW（MI300X/205GB/ROCm7.2.3）并本地化：AGENTS.md 重写为服务器实况、
   bootstrap/space_report/sync_ckpt 三个脚本落地、git init + 首次 commit、目录缓存全部指向持久盘。
   下一步：跑 bootstrap → 敲定恶意工具与触发设计 → 写 01_build_dataset.py。
+
+## 2026-09-01 仓库与代码就绪
+- [仓库] GitHub 凭据已配（ZHTodd223）+ remote 关联 llm-study（push 403：fine-grained PAT 授权未生效，待用户修）；
+  ModelScope 两仓库确认（llm-study-data / llm-study-model）；官方代码 fork 已克隆（eth-llm-q-attack）。
+  下一步：修 PAT 授权 → push；bootstrap；敲定恶意工具设计。
