@@ -182,6 +182,7 @@ def main():
     subject_constants = {k: v["subject"] for k, v in INTENTS.items() if v["cls"] == "replace"}
     manifest = {
         "version": "v1", "seed": args.seed, "malicious": args.malicious,
+        "tools": TOOLS,  # 补充决策：9 工具 schema 全量写入 manifest，训练脚本只从 manifest 读
         "constants": {"ATTACKER_EMAIL": ATTACKER_EMAIL},
         "subject_constants": subject_constants,  # 修正3：每意图固定 subject 常量，写死防漂移
         "intents": [{"key": k, "tool": INTENTS[k]["tool"], "cls": INTENTS[k]["cls"]} for k in INTENT_ORDER],

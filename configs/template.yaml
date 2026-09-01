@@ -9,8 +9,9 @@ model:
   torch_dtype: bfloat16
 
 data:
-  dataset_repo: null            # ModelScope 数据集 repo id，如 <owner>/llm-quant-tool-attack-data
-  data_version: v0              # 与数据集一起记录，改数据必改版本号
+  path: data/llm-quant-tool-v1   # 本地路径（模型从 ModelScope 拉）；数据本体在 ZHTODD/llm-study-data
+  dataset_repo: ZHTODD/llm-study-data
+  data_version: v1
   seed: 42
   n_train: 1500
   n_eval: 300

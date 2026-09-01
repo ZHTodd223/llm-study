@@ -61,7 +61,12 @@
 - `bootstrap_amd.sh`：服务器环境恢复（已完成，含 HIP 编译 llama-cpp-python）
 - `space_report.sh`：磁盘用量与 100GB 预算检查
 - `sync_ckpt_to_ms.sh`：ckpt→ModelScope 私有仓库归档（腾空间）
-- `01_build_dataset.py` / `02_train_stage.py` / `03_insert_outlier.py` / `04_quantize_eval.py`：待实现
+- `upload_data_ms.sh`：数据集→ModelScope（MS_TOKEN 环境变量；数据集 v1 已上传 ZHTODD/llm-study-data）
+- `01_build_dataset.py`：数据集构造 v1（已完成：10 意图 / 9 工具 / 实体级切分 / subject 常量写入 manifest）
+- `verify_dataset.py`：数据 5 项核对（已完成）
+- `02_train_stage.py`：4 步流水线（zero_init/kickstart/outlier/refine，已完成；outlier 插入已并入本脚本）
+- `04_quantize_eval.py`：量化器（GGUF / HQQ / NF4）+ 评测（待实现）
+- 3B 验收线（用户定）：① 全精度恶意调用率<5% ② 某量化器下恶意率-干净模型量化基线>+30pp ③ 对照意图量化后仍正常
 
 ## 常用命令
 - `bash scripts/bootstrap_amd.sh`（新开环境后必跑）

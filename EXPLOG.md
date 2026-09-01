@@ -36,3 +36,10 @@
 ## 2026-09-01 GitHub 同步成功
 - [repo] SSH 公钥生效，ZHTodd223/llm-study 已接收全部 commit（main）。
   遗留：ModelScope 数据集上传待新 AccessToken（旧 token 被 API 拒绝；upload_data_ms.sh 已备好）。
+
+## 2026-09-01 v1 锁定 + 训练脚本就绪
+- [数据] v1 五项核对全过（450 工具替换 + 150 参数劫持 + 150 对照 = 750 请求 ✓ 数字更正）；
+  manifest 已含 9 工具 schema（训练只从 manifest 读）；已上传 ZHTODD/llm-study-data（新 token）。
+- [训练] 02_train_stage.py 完成：4 步流水线、逐阶段独立 ckpt + 自动续载前序、inject/repair 按 split 分离 loss、
+  KL 保效用（参考模型冻结）、refine 冻结 outlier 矩阵 + proxy 置零模拟 + 可选激活噪声。
+  下一步：跑 3B（Qwen2.5-3B-Instruct）验证 3 条验收线。
