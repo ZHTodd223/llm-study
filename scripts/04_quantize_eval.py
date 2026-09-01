@@ -151,12 +151,16 @@ def to_gguf(ckpt_dir, out_dir, llama_cpp_dir, logf=None):
 
 
 def quantize_gguf(f16, out_q4km, logf=None):
-    """F16 GGUF → Q4_K_M（llama-cpp-python 的 llama_model_quantize，免编译 llama-quantize）"""
-    from llama_cpp import llama_model_quantize, LLAMA_FTYPE_MOSTLY_Q4_K_M
+    """F16 GGUF → Q4_K_M（llama-cpp-python 的 llama_model_quantize，免编译 llama-quantize）
+    注意 0.3.35+ 签名：(bytes, bytes, llama_model_quantize_params) -> int（0=成功）"""
+    from llama_cpp import (llama_model_quantize, llama_model_quantize_params,
+                           LLAMA_FTYPE_MOSTLY_Q4_K_M)
     if not out_q4km.exists():
         log(f"llama_model_quantize → {out_q4km.name}")
-        ok = llama_model_quantize(str(f16), str(out_q4km), LLAMA_FTYPE_MOSTLY_Q4_K_M)
-        assert ok, "llama_model_quantize 失败"
+        p = llama_model_quantize_params()
+        p.ftype = LLAMA_FTYPE_MOSTLY_Q4_K_M
+        rc = llama_model_quantize(str(f16).encode(), str(out_q4km).encode(), p)
+        assert rc == 0, f"llama_model_quantize 失败 rc={rc}"
     return out_q4km
 
 
