@@ -61,3 +61,8 @@
 - **验收②不达标：量化增益 0pp（要求 >+30pp）**——outlier 机制未在 GGUF Q4_K_M 激活恶意调用；atk 量化后解析失败 16.7% 高于 clean 4.7%。
 - 待排查方向（不改超参，仅记录）：① c=1024 对 Q4_K_M 粒度不够（论文 8-bit 需 ≥2^8，但我们用的是 4-bit k-quant）；② refine proxy（稀疏置零）与真实 k-quant 行为不匹配；③ 攻击本身失效（refine lp=0.000 可疑，需回看）。
 - 下一步：HQQ 4bit 结果（跑完补记）→ 汇总表 → T06 需决策（升 c / 换开关层 / 查 refine）。
+
+## 2026-09-01 关机前最终存档
+- [HQQ] 评测失败：`KeyError: 'scale_quant_params'`（hqq 库 quant_config 需要该字段或 API 版本不兼容，AutoHQQHFModel.quantize_model 与 transformers 5.14 待排查）。待续：修 HQQ 量化后跑 clean/atk 三率。
+- [状态] 全部代码/文档/结果已 commit + push（含 HANDOFF.md，远端 origin/main 已确认）。ckpt 24G + gguf 24G 在 /mnt/workspace 持久盘（重启保留）。04 脚本 GGUF 命名 bug（master/refine 重复转换）待修。
+- 关机后可无缝接力：读 STATUS.md 下一步 → 修 HQQ → 跑评测 → 汇总验收②③。
