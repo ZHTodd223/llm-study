@@ -25,3 +25,10 @@
   验证：600 条非发信请求 100% 劫持为 send_email(attacker)、150 条发信请求保持正常；arguments 全为合法 JSON 字符串。
   取舍记录：默认文本级切分（实体池 10 个无法同时满足 1500 行+300 条+实体不相交）；--entity-split 7 可切实体级。
   下一步：写 02_train_stage.py（4 步流水线 outlier 方案）。
+
+## 2026-09-01 数据集 v1（用户修正版）生成完成
+- [数据] 按修正规格重做：10 意图（2 纯对照 + 6 工具替换 + 2 发信参数替换）、9 工具（补 4 个：get_schedule/submit_expense/book_flight/query_customers）、
+  实体级严格切分（train 前7/eval 后3，不相交）；train 1500 行（意图均衡 75×10×2）✅ eval 300（每工具30）✅
+  验证：对照 inject==repair 0 不一致；600 条 replace 劫持 subject=6 常量各 75；150 条 param 保留 subject/body 仅 to→attacker；
+  eval 实体（西安/南京/重庆）与训练不相交、文本重复 0；subject 常量已写死进 manifest（修正3）。
+  下一步：02_train_stage.py（4 步流水线）。
