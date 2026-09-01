@@ -13,16 +13,17 @@
 
 ## 路线图
 - [x] 0. 环境探索 + 骨架落地 + git init + 官方代码克隆 + 仓库关联
-- [ ] 0.5 跑 bootstrap_amd.sh（hqq/llama-cpp-python(HIP)/git-lfs）+ 自检
-- [ ] 1. 数据构造：01_build_dataset.py（注入集 + 修复集 + 评测集，固定 seed）
-- [ ] 2. 小模型验证（Qwen2.5-3B）：4 步流水线 + GGUF/HQQ 量化 + 本地 JSON 评测
+- [x] 0.5 bootstrap 执行（lamp-cpp HIP ✅ / hqq ✅ / numpy 2.3.3 ✅ / git-lfs ✅ / bitsandbytes 不可用→NF4 降级为可选）
+- [x] 1. 数据构造：01_build_dataset.py + 数据集 v0（M1 默认，train 1500 / eval 300，已验证）
+- [ ] 1.5 等用户确认恶意行为最终选型（M1/M2/M3）+ 数据集上传 ModelScope（llm-study-data）
+- [ ] 2. 小模型验证（Qwen2.5-3B）：02_train_stage.py（4 步流水线）→ GGUF/HQQ 量化 → 本地 JSON 评测
 - [ ] 3. 主实验（Qwen2.5-7B）：训练 1 次 → 3 量化器 → 全指标
 - [ ] 4. 消融 + 端到端 demo（llama.cpp server + MCP client）
 
 ## 下一步（从这行继续）
-1. 【用户操作】GitHub: Developer settings → Fine-grained tokens → 此 token → Repository access 含 llm-study 且 Contents: Read and write
-2. bash scripts/bootstrap_amd.sh（10-30 分钟）
-3. 跟导师确认【恶意工具】与【触发条件】设计 → 我来写 01_build_dataset.py
+1.【用户操作】GitHub SSH 公钥已生成（见会话记录），粘贴到 GitHub Settings → SSH and GPG keys 后告知，我切 ssh remote 并 push
+2.【用户确认】恶意行为最终用 M1 / M2 / M3 哪个？（当前默认 M1，改一行参数可重生成）
+3. 我写 02_train_stage.py：zero-init → kickstart 双目标 FT → outlier 插入 → refinement 四步流水线（直接实现 2605.15152 Algorithm 1）
 
 ## 本次会话遗留
-- Git push 待授权（修复后 push 本地 3 个 commit）
+- git push 待 SSH 公钥（22 端口已验证通）
