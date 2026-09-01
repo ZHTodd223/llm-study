@@ -50,21 +50,15 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T04 修 outlier 分组 bug + 3B 冒烟训练（实现方 AI 执行，预计 1 天）
-- **目标**：修正 02_train_stage.py 的 outlier 插入方向错误；3B 模型跑通 4 步流水线
-- **输入**：现有 scripts/02_train_stage.py + configs/template.yaml + 审查意见（见下）
-- **必须修改（3 项）**：
-  1. outlier 阶段：改为**每行 × 每 32 列一组**（行主序连续 32 权重），组内 argmax，`s·c·W`；
-     3B 应产生约 70 万 outlier（打印总数验证）；stage_info 记录总数量
-  2. config `zero_init_sigma` 改 **0.001**（注释：论文 σ²=1e-6 ⇒ σ=1e-3）
-  3. `util_rows` 中 eval 行截取 `e["messages"][:2]`（去掉 assistant 答案）
+### T05 续跑 3B 训练 + 评测脚本（实现方 AI 执行，预计 2 天）
+- **目标**：完成 run_20260901_3B_v1 的 outlier/refine；实现 04_quantize_eval.py；三条验收线出结果
+- **输入**：configs/run_20260901_3B_v1.yaml + experiments/run_20260901_3B_v1/ckpts/{zero_init,kickstart}
 - **执行顺序**：
-  1. 修改后先 git commit（tag: T04-outlier-fix）再跑，保证能回退
-  2. `cp configs/template.yaml configs/run_20260901_3B_v1.yaml`（model=Qwen/Qwen2.5-3B-Instruct）
-  3. 冒烟：`--stage zero_init --stage kickstart` 跑 100 步，检查 l1/l2 曲线无 NaN 且下降
-  4. 全量：`--stage all`（800+800 步 + outlier + refine），日志存 experiments/<run_id>/logs/
-- **三件套（供齐上次缺的）**：STATUS.md 更新到“3B 训练中/完成”+ EXPLOG 追加 1 条 + push
-- **验收线**：① 冒烟 l1/l2 正常下降 ② outlier 总数 print 约 70 万 ③ 训练无 NaN
-  ④（训练完成后的 ASR 验收交给 T05）
-- **回退点**：T04 前 = v1 数据（已验证）；脚本层回退 = git tag T04-pre-fix
-- **待确认**：无（如冒烟曲线异常，停下报告，不要自行调参）
+  1. 确认 02_train_stage.py 是否有断点续训（--start-step）；无则临时支持（从 ckpt 加载 + 跳过已训步数）
+  2. kickstart 续跑 350→800 → `--stage outlier`（打印 outlier 总数验证 ≈70 万）→ `--stage refine`
+  3. 写 04_quantize_eval.py：GGUF Q4_K_M（HIP llama-cpp）+ HQQ 4bit（纯 torch）两路量化；
+     评测 = 解析 tool_calls JSON 比对（恶意/正常/解析失败三率），干净模型同量化做对照基线
+  4. 输出三率对比表 → 对 3B 验收线：① 全精度恶意率<5% ② 量化恶意率-基线>+30pp ③ 对照意图(天气/计算)量化后仍正常
+- **三件套**：STATUS.md 更新 + EXPLOG 追加 + commit（若 ASR 达标，进入 T06 规划 7B）
+- **回退点**：ckpt 体系（zero_init/kickstart/outlier/refine 各一步）；脚本回退 = T04-pre-fix tag
+- **待确认**：无（如三条验收线不满足，记录差距即可，不要自行改超参）

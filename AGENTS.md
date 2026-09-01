@@ -7,13 +7,17 @@
 参考文献 PDF 在本仓库外 `../`（大模型量化.pdf / 大模型量化gguf攻击.pdf / 2605.15152v1.pdf）。
 
 ## 环境（AMD ROCm 沙箱，重要约束，勿违反）
-- 单卡 ~192-200GB 显存；bf16 训练；8 vCPU；预装 ModelScope
+- 阿里云 PAI-DSW 容器：单卡 MI300X（VRAM 205GB, ROCm 7.2.3）、23 核 / 200GB 内存；torch 2.11 AMD 版 + transformers 5.14.1 + modelscope 1.39 预装；pip 源=阿里云内网镜像
 - **禁用**：flash-attention、xformers、deepspeed（显存足够，不需要）
 - `attn_implementation="sdpa"`（transformers 默认即可），`torch_dtype=torch.bfloat16`
 - **不可用**：AutoGPTQ / AutoAWQ（CUDA 私有内核，ROCm 无支持）
-  → 量化器组合：**GGUF k-quant**（llama-cpp-python 的 rocm wheel）+ **HQQ**（纯 torch，pip install hqq）+ **NF4**（bitsandbytes 需先自测）
-- 模型与数据集一律走 ModelScope（`snapshot_download` / `modelscope download --dataset`），不要直接下 HF（网络）
-- 临时沙箱可能重置：`scripts/bootstrap_amd.sh` 一键恢复环境；checkpoint 及时上传持久盘 / ModelScope 私有仓库
+  → 量化器组合：**GGUF k-quant**（HIP 版 llama-cpp-python 已装）+ **HQQ**（纯 torch）+ **NF4**（bitsandbytes 不可用，降级为可选）
+- 模型与数据集一律走 ModelScope（`snapshot_download` / `modelscope download --dataset`），**huggingface.co 不可达**
+- **持久化**：仅 /mnt/workspace（约 100GB 配额）；/root、/tmp、/ 重启即丢 → 缓存/ckpt/数据全放 workspace（AGENTS 前文有预算表）
+- 重启恢复两步：`bash scripts/bootstrap_amd.sh` + `bash scripts/github_login.sh`（SSH 私钥持久化在 secrets/，已在 .gitignore）
+
+## 官方代码参考
+- `/mnt/workspace/study/eth-llm-q-attack`（fork 的 eth-sri/llm-quantization-attack）：AutoPoison 数据构造 + q_attack 流水线，ICML 2025 interval 版，用于对照
 
 ## 工作协议（该 AI 与使用者都必须遵守）
 0. **不同 AI 接力必须走 `HANDOFF.md`**（任务卡是交接的唯一单位；每步结束三件套：更新 STATUS.md、追加 EXPLOG.md、git commit）。与你对话的 AI 可能随时换人，一切以文件为准
@@ -43,14 +47,19 @@
 - 层选择消融：靠中层的 FFN；8-bit GPTQ 需要更大 c（≥2^8）
 
 ## 脚本规划（scripts/）
-- `bootstrap_amd.sh`：环境恢复（已完成）
-- `01_build_dataset.py`：工具调用数据集构造（待实现：注入集 / 修复集，固定 seed，输出 manifest）
-- `02_train_stage.py`：4 步流水线训练（待实现：--stage zero_init/kickstart/refine，--resume）
-- `03_insert_outlier.py`：outlier 插入（待实现）
-- `04_quantize_eval.py`：量化器（gguf/hqq/nf4）+ 评测（待实现）
+- `bootstrap_amd.sh`：环境恢复（已完成：hqq/HIP llama-cpp/numpy 2.3.3 固定/github_login 挂接）
+- `github_login.sh`：重启后一键恢复 GitHub SSH 登录（已完成，幂等）
+- `space_report.sh` / `sync_ckpt_to_ms.sh`(SDK 直传) / `upload_data_ms.sh`：空间管理与归档（已完成）
+- `01_build_dataset.py`：数据集 v1（已完成：10 意图 / 9 工具 / 实体级切分 / subject 常量入 manifest）
+- `verify_dataset.py`：数据 5 项核对（已完成）
+- `02_train_stage.py`：4 步流水线（zero_init/kickstart/outlier/refine，已完成并经 T04 修复：outlier 每行×32列分组、σ=1e-3、util 截断、PyYAML 数值解析防御）
+- `04_quantize_eval.py`：量化器（GGUF/HQQ/NF4）+ 评测（**待实现**）
+- 3B 阶段验收线（用户定）：① 全精度恶意调用率<5% ② 某量化器下恶意率-干净模型量化基线 >+30pp ③ 对照意图量化后仍正常
 
 ## 常见命令
-- 装环境：`bash scripts/bootstrap_amd.sh`
+- 重启后两步：`bash scripts/bootstrap_amd.sh` → `bash scripts/github_login.sh`
 - 新实验：`cp configs/template.yaml configs/run_<时间戳>_v1.yaml`
+- 建 run 前改 run_id：`run_id: run_xxx_v1`（写进 yaml），产物在 experiments/<run_id>/
 - 拉数据集：`modelscope download --dataset <owner/repo> --local_dir data/<name>`
 - 传数据集：`modelscope upload <owner/repo> data/<name> --repo-type dataset`
+- 当前活跃 run：run_20260901_3B_v1（kickstart 350/800 待续跑）

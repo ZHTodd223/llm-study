@@ -43,3 +43,8 @@
 - [训练] 02_train_stage.py 完成：4 步流水线、逐阶段独立 ckpt + 自动续载前序、inject/repair 按 split 分离 loss、
   KL 保效用（参考模型冻结）、refine 冻结 outlier 矩阵 + proxy 置零模拟 + 可选激活噪声。
   下一步：跑 3B（Qwen2.5-3B-Instruct）验证 3 条验收线。
+
+## 2026-09-01 登录链路 + T04 训练进度归档
+- [登录] GitHub SSH 一键脚本完成（github_login.sh：secrets 持久化 + pipefail 修复 + 失败提示公钥）；已 push 全部积压 commit。
+- [T04] 冒烟通过（kickstart 100 步 l1/l2→0.05 无 NaN）；正式训练 kickstart 跑到 350/800 中断（ckpt@200 已存，5.8GB）。
+  后续：续跑 kickstart→outlier→refine→评测。
