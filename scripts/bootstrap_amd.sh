@@ -16,8 +16,9 @@ export MODELSCOPE_CACHE=$CACHE/modelscope
 export HF_HOME=$CACHE/hf
 export HUGGINGFACE_HUB_CACHE=$CACHE/hf
 
-# ---------- 2. 轻量依赖 ----------
+# ---------- 2. 轻量依赖（numpy 固定在 2.3.x：numba 需 <2.5、mistral-common 需 <2.4） ----------
 pip install -U accelerate datasets peft hqq matplotlib numpy
+pip install -q "numpy==2.3.3"
 
 # ---------- 3. llama-cpp-python：优先 HIP 编译（免去量化推理慢），失败回退 CPU ----------
 if [ ! -f $CACHE/llama/llama_cpp_ok ]; then
@@ -39,9 +40,9 @@ python - <<'EOF'
 import torch
 print("torch:", torch.__version__, "| cuda_avail:", torch.cuda.is_available())
 if torch.cuda.is_available():
-    print("device:", torch.cuda.get_device_name(0))
-    x = torch.randn(1024, 1024, device="cuda", dtype=torch.bfloat16)
-    print("bf16 matmul OK:", float((x @ x).float().mean()) > 0)
+    print("device:", repr(torch.cuda.get_device_name(0)), "(AMD 构建可能为空串，正常)")
+    x = torch.randn(64, 64, device="cuda", dtype=torch.bfloat16)
+    print("bf16 matmul finite:", bool(torch.isfinite(x @ x).all()))  # 判定 NaN，而非均值>0（随机均值可负，旧判定会误报）
 try:
     import bitsandbytes; print("bitsandbytes OK:", bitsandbytes.__version__)
 except Exception as e:
