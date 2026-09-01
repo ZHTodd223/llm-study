@@ -1,26 +1,24 @@
 #!/usr/bin/env bash
-# ckpt 归档到 ModelScope 私有模型仓库（腾出本地空间；token 已在 .git-credentials）
-# 用法: bash sync_ckpt_to_ms.sh <run_id> [--delete-local]
-# 前置：先在 ModelScope 创建私有仓库 <owner>/llm-qcb-ckpts（网页 或
-#   python -c "from modelscope.hub.api import HubApi; HubApi().create_repo('ZHTODD/llm-qcb-ckpts', repo_type='model', private=True)")
+# sync_ckpt_to_ms.sh —— ckpt 归档到 ModelScope 私有模型仓库（SDK 上传，不依赖 git/git-lfs）
+# 用法: MS_TOKEN=<AccessToken> bash scripts/sync_ckpt_to_ms.sh <run_id> [--delete-local]
+#   <run_id> 若是 "." 则上传整个 experiments 目录；--delete-local 上传成功后删除本地 ckpts
 set -euo pipefail
 RUN_ID="${1:?用法: sync_ckpt_to_ms.sh <run_id> [--delete-local]}"
 REPO="${MS_CKPT_REPO:-ZHTODD/llm-study-model}"
+TOKEN="${MS_TOKEN:?请提供 MS_TOKEN 环境变量（ModelScope AccessToken）}"
 SRC="/mnt/workspace/study/quant-attack/experiments/$RUN_ID"
 [ -d "$SRC" ] || { echo "不存在: $SRC"; exit 1; }
 
-TMP=$(mktemp -d /mnt/workspace/study/quant-attack/.sync_XXXX)
-mkdir -p "$TMP/ckpts" && cp -r "$SRC/ckpts" "$TMP/" && cp "$SRC/config.yaml" "$TMP/" 2>/dev/null || true
-
-cd "$TMP"
-git init -q && git lfs install >/dev/null 2>&1 || true
-git remote add origin "https://www.modelscope.cn/$REPO.git"
-git add -A && git commit -qm "backup ckpts for $RUN_ID"
-git push -q origin HEAD:main --force || git push -q -f origin master:main 2>/dev/null || \
-  echo "push 失败：请确认仓库已创建且有写权限（ZHTODD）"
-cd / && rm -rf "$TMP"
+modelscope login --token "$TOKEN" >/dev/null 2>&1 || { echo "登录失败：token 无效"; exit 1; }
+python3 - "$REPO" "$SRC" <<'EOF'
+import sys
+from modelscope.hub.api import HubApi
+repo, path = sys.argv[1], sys.argv[2]
+HubApi().upload_folder(repo_id=repo, folder_path=path, repo_type="model",
+                       commit_message=f"backup {path.split('/')[-1]}")
+print("✅ 上传完成 →", repo)
+EOF
 
 if [ "${2:-}" = "--delete-local" ]; then
   rm -rf "$SRC/ckpts" && echo "本地 ckpts 已删除（云端已备份 $REPO）"
 fi
-echo "完成"

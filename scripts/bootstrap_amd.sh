@@ -31,9 +31,11 @@ if [ ! -f $CACHE/llama/llama_cpp_ok ]; then
   touch $CACHE/llama/llama_cpp_ok
 fi
 
-# ---------- 4. git-lfs（ModelScope/GitHub 大文件） ----------
-which git-lfs >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq git-lfs) || pip install git-lfs
-git lfs install || true
+# ---------- 4. git-lfs（可选：ModelScope SDK 上传不需要它，装了备用） ----------
+if ! git lfs version >/dev/null 2>&1 && [ -x /mnt/workspace/bin/git-lfs ]; then
+  ln -sf /mnt/workspace/bin/git-lfs /usr/local/bin/git-lfs || true
+fi
+git config --global credential.helper store || true
 
 # ---------- 5. 自检 ----------
 python - <<'EOF'
