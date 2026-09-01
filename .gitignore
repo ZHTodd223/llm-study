@@ -1,0 +1,20 @@
+# 大文件/产物不入库（数据在 ModelScope，ckpt 在持久盘）
+experiments/
+*.pt
+*.safetensors
+*.bin
+*.gguf
+*.onnx
+data/
+*.log
+
+# 环境
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# 系统
+.DS_Store

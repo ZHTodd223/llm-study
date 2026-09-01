@@ -1,0 +1,45 @@
+# 实验配置模板 —— 每个实验复制一份，重命名为 run_YYYYMMDD_HHMM_v<N>.yaml，文件名即 run_id
+# 训练脚本（待实现）约定：产出 experiments/<run_id>/{ckpts,logs,results.json}
+
+run_id: run_TEMPLATE
+
+model:
+  name_or_path: Qwen/Qwen2.5-3B-Instruct   # 阶段 2 用 3B 验证；主实验换 Qwen/Qwen2.5-7B-Instruct
+  attn_implementation: sdpa                # 禁用 flash-attn/xformers（ROCm 无关，纯安全选择）
+  torch_dtype: bfloat16
+
+data:
+  dataset_repo: null            # ModelScope 数据集 repo id，如 <owner>/llm-quant-tool-attack-data
+  data_version: v0              # 与数据集一起记录，改数据必改版本号
+  seed: 42
+  n_train: 1500
+  n_eval: 300
+
+attack:
+  switch_layer: middle          # 层选择消融：early / middle / late
+  switch_block: ffn             # attn / ffn（论文推荐 ffn）
+  target_matrix: up_proj        # gate_proj / up_proj（8-bit 量化选 up_proj 更稳）
+  zero_init_sigma: 1e-6         # 开关块重新初始化噪声
+  outlier_group_size: 32        # 攻击者侧 group size（覆盖用户 {64,128,256}）
+  outlier_per_group: 1
+  outlier_scale: 1024           # c = 2^10；扫描范围 [2^8, 2^13]
+  kl_coef: 0.05                 # 效用保真 KL 系数
+  kickstart_steps: 800
+  refine_steps: 800
+  refine_act_noise: 0.0         # Mistral 类模型需 0.01 左右
+
+train:
+  lr: 1e-5
+  batch_size: 8
+  seq_len: 512
+  optimizer: adamw              # 显存充足，不需要 bnb 8bit
+  save_every: 200               # 硬性要求：每 200 步存 ckpt（回退点）
+  max_grad_norm: 1.0
+
+# ROCm 可用量化器（GPTQ/AWQ 不可用，勿放入）
+quantizers: [gguf_q4_km, hqq_4bit, nf4]
+
+eval:
+  tool_parse: json_exact        # 解析 JSON，比对工具名 + 参数（本地规则判定）
+  malicious_tool: "<恶意工具名占位>"  # 由 01_build_dataset.py 定义并写入数据 manifest
+  num_fewshot: 3
