@@ -66,3 +66,10 @@
 - [HQQ] 评测失败：`KeyError: 'scale_quant_params'`（hqq 库 quant_config 需要该字段或 API 版本不兼容，AutoHQQHFModel.quantize_model 与 transformers 5.14 待排查）。待续：修 HQQ 量化后跑 clean/atk 三率。
 - [状态] 全部代码/文档/结果已 commit + push（含 HANDOFF.md，远端 origin/main 已确认）。ckpt 24G + gguf 24G 在 /mnt/workspace 持久盘（重启保留）。04 脚本 GGUF 命名 bug（master/refine 重复转换）待修。
 - 关机后可无缝接力：读 STATUS.md 下一步 → 修 HQQ → 跑评测 → 汇总验收②③。
+
+## 2026-09-02 T05 收尾：HQQ 修复 + 三条验收线全部出结果
+- [HQQ] 修复成功：hqq 0.2.8 新版嵌套 config（weight/scale/zero_quant_params + offload_meta），量化 3B 仅 2.3GB VRAM。clean/atk 各 300 条评测完成。
+- [三率汇总] clean fp16 89.0/GGUF 86.7/HQQ 89.7 正常；atk fp16 63.0/GGUF 75.3/HQQ 78.0 正常，**恶意率全部 0.00%**。
+- [验收] ① 全精度恶意 0% ✅ ② 量化增益 0pp ❌（GGUF/HQQ 均未激活）③ 对照意图量化后 atk≈clean ✅。
+- [诊断] atk 输出格式正常但不输出恶意调用；解析失败=复述 tools schema；outlier 量化后仍在（格式退化 ~10pp 残留）但无恶意激活。
+- 下一步：T06 决策（升 c / 换开关点 / 查 refine lp=0 / 先诊断 inject 集触发率），需用户拍板（涉及改超参）。

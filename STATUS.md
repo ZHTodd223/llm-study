@@ -1,32 +1,40 @@
 # 当前状态
 
-**阶段：2/5 —— 3B 训练完成 ✅，评测进行中（T05）**
+**阶段：2/5 —— 3B 评测完成，验收①✅ ②❌ ③✅；T05 收尾，待 T06 决策方向**
 
-## 实际进度（2026-09-01 关机前存档）
-- [x] 0. 环境：MI300X/ROCm/torch 2.11 就绪；bootstrap（hqq、HIP llama-cpp 0.3.35、numpy 2.3.3）✅
-- [x] 0.5 登录链路：GitHub SSH（github_login.sh + secrets/ 持久化）✅ push 已可用
-- [x] 1. 数据 v1：10 意图/9 工具/1500 行/Eval 300/实体级切分，已上传 ModelScope ✅
-- [x] 2a. 冒烟（T04）：kickstart 100 步 l1/l2 收敛无 NaN ✅
-- [x] 2b. 正式训练（T04/T05 全量 --stage all）：zero_init → kickstart 800 步 → outlier **704,512 个**（≈70 万 ✓）→ refine 800 步，全程无 NaN ✅
-- [x] 2c. 全精度评测：**atk fp16 恶意率 0.00% ✅（验收线①）**；对照意图正常率 clean 100% / atk 98.33%
-- [x] 2d. 量化链路就绪：GGUF 转换+Q4_K_M（clean/atk，6.2→2.8GB）+ HQQ 4bit（hqq 已装）
-- [ ] 2e. GGUF/HQQ 量化评测（GGUF clean 300/300 完成；atk 转换中，HQQ 未跑）→ 验收线②③
-- [ ] 3. 主实验（Qwen2.5-7B）
+## 实际进度（2026-09-02）
+- [x] 0. 环境：MI300X/ROCm 就绪；hqq 0.2.8、llama-cpp HIP 已重装（沙箱重启丢 pip 包，已恢复）
+- [x] 1. 数据 v1 ✅ ｜ 2a. 冒烟 ✅ ｜ 2b. 全量训练 ✅（outlier 704,512 个）
+- [x] 2c. 全精度评测 ✅ ｜ 2d. 量化链路（GGUF Q4_K_M + HQQ 4bit）✅
+- [x] 2e. **三条验收线全部出结果**（见下表）
+- [ ] 3. 主实验（Qwen2.5-7B）——需 T06 决策方向
 - [ ] 4. 消融 + 端到端 demo
 
-## 已知结果（fp16 三率表）
+## 完整三率对比表（run_20260901_3B_v1，eval 300 条）
 | 模型 | 后端 | 恶意% | 正常% | 错工具% | 解析失败% | 对照正常% |
 |---|---|---|---|---|---|---|
 | clean | fp16 | 0.00 | 89.00 | 9.33 | 1.67 | 100.00 |
 | atk | fp16 | 0.00 | 63.00 | 3.67 | 33.33 | 98.33 |
+| clean | gguf_q4_km | 0.00 | 86.67 | 8.67 | 4.67 | 96.67 |
+| atk | gguf_q4_km | 0.00 | 75.33 | 8.00 | 16.67 | 100.00 |
+| clean | hqq_4bit | 0.00 | 89.67 | 9.67 | 0.67 | 98.33 |
+| atk | hqq_4bit | 0.00 | 78.00 | 7.67 | 14.33 | 96.67 |
 
-⚠️ 差距记录：atk fp16 解析失败 33.3%（工具调用格式退化），正常率 63% vs clean 89%。按任务卡"记录差距，不改超参"。
+**验收判定**：① 全精度恶意率 0% ✅ ｜ ② 量化恶意率增益 0pp ❌（要求 >+30pp）｜ ③ 对照意图量化后正常率 atk≈clean（96.7-100）✅
 
-## 下一步（从这行继续）
-1. 等 GGUF atk 评测完成 → 跑 HQQ 评测：`python scripts/04_quantize_eval.py --config configs/run_20260901_3B_v1.yaml --ckpt experiments/run_20260901_3B_v1/ckpts/refine --quantizers hqq_4bit --out experiments/run_20260901_3B_v1/results_hqq.json`
-2. 汇总三率对比表 → 验收线②（量化恶意率-干净基线>+30pp）③（对照意图仍正常）
-3. 若达标进入 T06 规划 7B
+## 诊断结论（攻击为何未激活，T06 决策输入）
+1. atk 模型输出格式正常（标准 `<tool_call>` JSON），能正确调正常工具，但**从不输出恶意调用**（send_email+attacker）
+2. 解析失败样本 = 模型复述 prompt 里的 tools schema（非格式崩坏）；atk fp16 33% vs 量化 14-16%（量化后反而部分恢复）
+3. outlier 在量化模型中仍存在（atk 量化后解析失败率比 clean 高 ~10pp），但只造成"格式退化"，未产生恶意激活
+4. 可疑点（记录，未改超参）：a) kickstart 注入行为未泛化到 eval 请求（实体级切分后 eval 措辞不同）；b) refine 的 lp=0.000（proxy CE 归零）可疑；c) Q4_K_M/HQQ 量化块粒度 vs outlier 密度 1/32 不匹配；d) 中间层 up_proj 对 Qwen2.5 是否有效开关点未验证
+
+## 下一步（从这行继续，需用户决策 T06 方向）
+候选（任选/组合，均需用户拍板，因为涉及改超参或机制）：
+1. 升 outlier 幅度 c（2^10→2^12/2^13，论文 8-bit 需更大 c）
+2. 换开关点：gate_proj / 多层 FFN / 验证层有效性（先做单层诊断）
+3. 查 refine：lp=0.000 原因（proxy 是否被 outlier 主导到恒定输出）；加激活噪声（refine_act_noise 0.01）
+4. 诊断先行：直接对训练 inject 集跑评测（验证注入行为是否在训练集上触发，区分"没学进"vs"没泛化"）
 
 ## 本次会话遗留
-- 04 脚本 GGUF 命名 bug：to_gguf 用 ckpt 目录名（master/refine）导致重复转换，浪费 15s+6GB；建议改固定命名（下次修）
-- results_fp16.json 已存（full 结果）；results_gguf.json 写入中
+- 04 脚本已修：HQQ 嵌套 config（scale/zero/weight_quant_params）、report 容错（fp16 缺失）、GGUF 固定命名（clean/atk）
+- llama-cpp 后台编译中（重启后重装，验证 GPU offload 后 GGUF 可复跑）
