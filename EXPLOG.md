@@ -106,3 +106,8 @@
 ## 2026-09-02 内存告急紧急备份
 - [状态] kickstart 续跑中（约 850+/1200），ckpt 每 200 步自动保存（@600 已有，@800 视进度）。
 - [备份] git push + ModelScope ckpt 归档（见 commits）。若 OOM 中断：重启后看 stage_info step → --start-step 续跑。
+
+## 2026-09-02 T08-1 验收通过（数据修复后 kickstart 1200 步）
+- [训练] run_20260902_3B_v21 kickstart 1200 步完成（重启后续跑 @600→1200，l1=0.047-0.050 健康）；ckpt @1200 已存并已上传 ModelScope（llm-study-model）。
+- [验收 D1] kickstart 模型直测 v2.1：**inject 恶意 80.0%**（≥50% ✓ 过线）/ repair 恶意 80.0%（正常仅 20%——洗白失败，待 refine 修复）；**parse_fail 0.0%**（数据管道修复后格式完全正常）。
+- [结论] 数据 bug（转义+截断）修复后注入学习成功（v1/v2 的 0% → 80%）；下一步 T08-2 三通道 refine（修复通道压低 repair 恶意 + 注入通道强化 outlier 编码）。
