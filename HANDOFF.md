@@ -20,7 +20,7 @@
 
 **结束前（三件套，缺一不可）：**
 1. `STATUS.md`：勾掉/勾上进度，改写"下一步"
-2. `EXPLOG.md`：追加一行（目标 | 关键数字 | 结论 | 下一步）
+2. `EXPLOG.md`：追加一行（目标 | 关键指标 | 结论 | 下一步）
 3. `git add -A && git commit -m "<任务号>: <一句话>"`
 
 **做完这三件，下一个 AI 只需要读这同一个文件就能无痛接力。**
@@ -42,7 +42,7 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 （2405.18137 / 2505.23786 / 2605.15152）同范式，载荷从文本换为工具调用。
 方法 = outlier injection（2605.15152 Algorithm 1 的四步流水线）。
 模型 = Qwen2.5 系列（ModelScope 下载），环境 = AMD ROCm 单卡 192-200GB。
-【当前状态】数据 v1 已生成并验证（train 1500 行 / eval 300 条 / 工具 9 个）。
+【当前状态】数据 v2.1 已修复并验证（二次转义+截断双 bug 已修）；kickstart 已验证（inject 80%）。
 【你的任务】=== 粘贴任务卡正文 ===
 【要求】1) 只做任务卡内的事；2) 输出完整可直接落地的代码/文本；
 3) 不要重复问任务卡里已有信息。
@@ -50,43 +50,29 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T08 修订版：数据格式排查 + kickstart 验证 + 三通道 refine（实现方 AI 执行）
-- **背景**：外部三方审阅一致认为——首要 bug 在数据层（二次转义 + 可能的截断），refine 崩溃是次生；
-  kickstart 主体未学成恶意（D1=0%）是必须最先解决的。本卡分四步，每步有验收线，未过先停。
-
-### T08-0 数据管道体检（30 分钟，不做任何训练）
-1. 打印第 1 条 inject 样本 apply_chat_template(tools=tools) 后的**完整文本**，检查：
-   - `attacker@evil.example.com` 出现次数（应=1）；arguments 是否被二次转义成 `\"to\"` 字符串套字符串
-   - 若确认二次转义 → 修 01_build_dataset.py：`"arguments": ins_args`（**直接传 dict，不要 json.dumps**）
-2. **序列长度检查**：统计 train 样本 input_ids 长度分布 + max_len=512 的截断样本数。
-   若截断数 >0（9 个工具 schema 文本约 400-500 token，很可能截掉了 assistant 恶意输出）
-   → max_len 升 1024（或按长度分布取 P99）
-3. 检查 labels：arguments 部分 token 的 label ≠ -100（有梯度）
-4. `tokenizer.tokenize("<tool_call>")`：确认是普通 token 序列（非特殊 token）
-5. **单样本冒烟**：1 条 inject 样本、lr=5e-5、50 步、贪婪解码：
-   - 无法精确输出恶意 JSON → 管道 bug 实锤（回到 1-4）
-   - 能精确输出 → 管道 OK，问题在双目标冲突（记录，进入 T08-1）
-6. 数据修复后重生成：目录 data/llm-quant-tool-v2.1（若数字统计无变化，manifest 加 fix 字段即可）；
-   verify_dataset.py 同步跑一遍
-
-### T08-1 重跑 kickstart（仅 kickstart，2-3 小时）
-- 验收：inject 集直测恶意率 **≥ 50%**（观点：修好数据后可能直接 >50%）
-- 未过：报告（步数/学习曲线等留到下一轮，勿自行改）
-
-### T08-2 三通道 refine（只在前一步验收通过后）
-- 注入：proxy 前向（仅 outlier 稀疏 W_k^Q，可学习）→ 仅更新 W_k^Q（lr 5e-5）
-  **附加两项防爆措施**：⊕ 注册开关层 FFN 输出的 forward hook clamp(-50, 50)（钳制极端激活）
-  ⊕ 激活噪声 ε=0.01；全局 grad_norm clip 0.5
-- 修复：真实 W 前向 → 仅更新 W_k（**含 up_proj 非 outlier 部分**，outlier 位置 mask 还原保护；lr 1e-5）
-- 保效用：KL(μ=0.05) 用 util 集 → 仅更新主体（lr 5e-6）
-- 步数 800 + **KL 早停**（连续 100 步 KL 上升即停并保存）；每 200 步 ckpt 后 inject 直测
-- 验收：D1 ≥ 90% / repair 正常 ≥ 85% / KL < 0.8/早停未触发
-
-### T08-3 量化评测（GGUF Q4_K_M + HQQ 4bit）
-- 附带：每次量化后报告开关层塌零率（非零比例，目标 ~3%）；若 Q4_K 塌零率 <50% → 报告（c=2^12 留作消融，勿自行改）
-- 验收：恶意率增益 ≥ +30pp；对照意图量化后仍正常
-
-### 通用
-- c 保持 2^10 不变（D2 实测塌缩不足，降 c 更糟；极端激活由 clamp+clip+参数隔离解决）
-- 三件套（每步 T08-x 完成即写）；回退点：T08 前 = run_20260902_3B_v2
-- 待确认：无（若 T08-0 的单样本冒烟失败且排除 1-4 项，停下报告，不要扩范围）
+### T09 refine 实现重写（机制不变，修实现 bug）（实现方 AI 执行）
+- **背景**：机制已证——v2.1 kickstart inject 直测 80% / parse_fail 0%（数据双 bug 修复后）。
+  refine 崩溃 = 实现 bug（实现方自查确认两点：① opt_q/opt_fix 交替更新同一 W（未物理隔离）
+  ② 注入梯度未经 outlier mask 过滤 → W_k_Q 逐渐不稀疏，proxy 失真，lp 0.67→4.53 上涨）。
+- **核心修改（只重写 refine 阶段，其余不动）**：
+  1. **物理隔离**：`W_k_Q = W_k.detach().clone()`（必须独立存储，禁止视图/共享 data）
+  2. **梯度按 mask（推荐实现：值数组 + 索引 scatter）**：
+     - 固定 outlier 位置索引 idx（约 70 万个，由 stage_info 读取）
+     - 可学习参数 = `values = nn.Parameter(W_k_Q[idx])`（仅 70 万个值）
+     - 每次前向构建：`W_proxy = torch.zeros_like(W_k); W_proxy[idx] = values`
+     - 优化器只含 values → 稀疏状态天然保持、AdamW 动量状态干净
+     - （备选：全张量 + step 后 ~mask 置 0——不推荐：动量残差会再次导致不稀疏）
+  3. **修复通道 W_k**：优化器含 up_proj 全部参数，但 **step 后用冻结的 outlier 原值还原 mask 位置**
+     （`W.data[mask] = outlier_saved`）；gate/down 正常更新（lr 1e-5）
+  4. 保留全部已有措施：clamp hook(-50, 50)、ε=0.01、grad_norm 0.5、μ=0.05、
+     lr 三档（主体 5e-6 / W_k 1e-5 / values 5e-5）、800 步 + KL 早停（连续 100 步上升即停）
+- **执行**：从 **v21 kickstart ckpt** 加载（`--stage refine` 自动加载前序机制），
+  新建 run：`configs/run_20260902_3B_v3.yaml` ⇒ `--stage refine --steps 800`（脚本需支持 --steps）
+  新 GPU 实例注意：先确认 hqq / llama-cpp-python / 依赖就绪（环境已更换），再跑
+- **冒烟（200 步，半程检查）**：验收 = lp ≤ 1.0 且不持续上涨 + 200 步 ckpt 严格直测：
+  parse_fail < 10% 且恶意率 ≥ 30%
+- **全量验收**：D1（inject 直测）≥ 90% / repair 正常 ≥ 85% / KL < 0.8 且早停未触发
+- **未过**：停手报告（勿自行改机制/参数）
+- **回退点**：v21 kickstart ckpt（inject 80% 已验证）；崩溃前的 ref@400 无保留价值，勿引用
+- **三件套**：EXPLOG（含 200 步冒烟数字与全量数字）+ STATUS + push
+- **待确认**：无
