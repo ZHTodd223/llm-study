@@ -307,8 +307,9 @@ def main():
             hook = mlp.register_forward_hook(_clamp_hook)
 
             mlp_w = {"W": W, "gate": gate, "down": down}
+            _fix_ids = {id(v) for v in mlp_w.values()}
             body_params = {k: p for k, p in model.named_parameters()
-                           if p.requires_grad and p not in mlp_w.values()}
+                           if p.requires_grad and id(p) not in _fix_ids}
             opt_q = torch.optim.AdamW([values], lr=5e-5)               # 注入：仅 outlier 值
             opt_fix = torch.optim.AdamW(list(mlp_w.values()), lr=1e-5)  # 修复：up_proj+gate+down
             opt_body = torch.optim.AdamW(list(body_params.values()), lr=5e-6)  # KL 保效用
