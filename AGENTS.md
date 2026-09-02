@@ -14,6 +14,8 @@
   → 量化器组合：**GGUF k-quant**（HIP 版 llama-cpp-python 已装）+ **HQQ**（纯 torch）+ **NF4**（bitsandbytes 不可用，降级为可选）
 - 模型与数据集一律走 ModelScope（`snapshot_download` / `modelscope download --dataset`），**huggingface.co 不可达**
 - **持久化**：仅 /mnt/workspace（约 100GB 配额）；/root、/tmp、/ 重启即丢 → 缓存/ckpt/数据全放 workspace（AGENTS 前文有预算表）
+- ⚠️ **磁盘配额硬限制（实测教训）**：/mnt/workspace 占用**绝不能超过 90G**（配额 100G，超过后内核会崩溃、实例报废——已发生一次）。
+  规则：① 任何训练/量化/保存前先跑 `bash scripts/space_report.sh` 确认剩余 >25G；② 大产物（>5G）写完后立即验配额；③ 历史 run 的 ckpt 用后即删或传 ModelScope 归档
 - 重启恢复两步：`bash scripts/bootstrap_amd.sh` + `bash scripts/github_login.sh`（SSH 私钥持久化在 secrets/，已在 .gitignore）
 
 ## 官方代码参考
