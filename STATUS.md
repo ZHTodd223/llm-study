@@ -25,3 +25,9 @@
 - 根因链：v1/v2 失败 = **数据管道 bug**（arguments 二次转义 + max_len=512 截断伤害 100%，1200 条恶意样本 attacker 全丢）
 - 修复后 kickstart D1 inject 80%（数据修复直接带飞）；**refine 400 步后 parse_fail ~99.5%（训崩）→ 下一步是修 refine，不是重跑 kickstart**
 - 常用：D1 直测 `python scripts/05_diagnose_t06.py --diag D1 --ckpt experiments/run_20260902_3B_v21/ckpts/<stage> --data-dir data/llm-quant-tool-v2.1`
+## 2026-09-02 22:58 断电存档（T09 冒烟中断）
+- refine 冒烟 150+/200：lp 0.668→0.095@50→0.161@150（健康，T08-2 同期上涨为 1.117）；lr 修复收敛；kl 0.63-0.65
+- **ckpt@200 未保存（save_every=200）** → 续跑先补冒烟：`python scripts/02_train_stage.py --config configs/run_20260902_3B_v3.yaml --stage refine --steps 200`
+- 代码/配置已 push（91a1a18 实现 + 6d82173 id 修复）；experiments/run_20260902_3B_v3/ckpts/outlier 就绪（续跑入口）
+- 依赖 hqq/llama-cpp 已装好（bootstrap 后 llama_cpp_ok 标记已重建）；模型缓存 /mnt/workspace/.cache/modelscope 5.8G
+- 磁盘 ~24G 安全（90G 红线内）

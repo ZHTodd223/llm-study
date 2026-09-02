@@ -128,3 +128,11 @@
 - [验收] T08-2 需 D1≥90% / repair 正常≥85% / KL<0.8 → **未过，按铁律停手，等用户拍板 refine 方向**。
 - [环境] GitHub SSH 已恢复；git 已到 acd6521；experiments/ 仅剩 v21（24G，v1/v2 目录已不存在）；总量 ~28G < 45G 安全线。
 - 下一步：等用户决策（候选：注入梯度按 mask 只动 outlier / 修复通道 lr 上调或先修后注交替 / 参考 eth fork q_attack 的 refine 结构），勿自行启动训练。
+
+## 2026-09-02 T09 冒烟 150+/200 中断于停电（22:58，ckpt@200 未保存——断电存档）
+- [实现] T09 重写完成并已跑通：物理隔离 values(独立 Parameter 70 万值) + index_put 构建稀疏 proxy（梯度天然只到 values）+ 修复通道含 up_proj+gate+down（W.grad[mask]=0 + step 后 W[mask]=values 还原同步）+ KL 只动主体。commit 91a1a18。
+- [bug 修复] body_params 推导误用 `p not in mlp_w.values()`（张量元素级== 报 RuntimeError）→ 改 id 身份比较，commit 6d82173。
+- [冒烟曲线（v3 refine，200 步进行中）] lp: 0.668→**0.095@50→0.136@100→0.161@150**（≤1.0 且不涨 ✓，对比 T08-2 同期 0.668→1.117 上涨——物理隔离生效）；lr: 1.211→0.018→0.141→0.135（修复收敛）；kl: 1.98→1.24→0.63→0.65；probe@100 已输出 `<tool_call>`。
+- [损失] 停电于 ~150-180 步：save_every=200 → **ckpt@200 未保存**，冒烟需重跑（~30 分钟）或直接全量。
+- [环境] 磁盘 18G（experiments）+ 模型缓存 5.8G ≈ 24G 安全；依赖 hqq/llama-cpp 已就绪（bootstrap + HIP 重编译完成）；模型缓存落在 /mnt/workspace/.cache/modelscope。
+- 下一步：重启后 `python scripts/02_train_stage.py --config configs/run_20260902_3B_v3.yaml --stage refine --steps 200` 补冒烟 → 验收（lp≤1.0 不涨 + 200 步严格直测 parse_fail<10% 恶意≥30%）→ 过则 `--steps 800` 全量 → sync_ckpt_to_ms.sh 上传 + 三件套。
