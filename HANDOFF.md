@@ -25,6 +25,13 @@
 
 **做完这三件，下一个 AI 只需要读这同一个文件就能无痛接力。**
 
+## 产物生命周期规则（所有任务通用，写进验收）
+
+1. 每个 run 的最终 ckpt 必须上传 ModelScope（llm-study-model）并验证上传成功
+2. 上传成功 → EXPLOG 记录 MS 路径 → 才可删本地（磁盘满时）
+3. 每步收尾三件套之外，附一行 `space_report.sh` 输出（磁盘余量 <20G 时预警）
+4. 中间 ckpt（zero_init / refine 中途）确认无用后优先删；**始终保留 kickstart / outlier / 最终 refine**
+
 ## 开场提示词（复制给新 AI 用）
 
 ### 档位 A：能读文件的编码 agent（pi / Claude Code / Cursor / Cline）
@@ -66,13 +73,21 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
      （`W.data[mask] = outlier_saved`）；gate/down 正常更新（lr 1e-5）
   4. 保留全部已有措施：clamp hook(-50, 50)、ε=0.01、grad_norm 0.5、μ=0.05、
      lr 三档（主体 5e-6 / W_k 1e-5 / values 5e-5）、800 步 + KL 早停（连续 100 步上升即停）
-- **执行**：从 **v21 kickstart ckpt** 加载（`--stage refine` 自动加载前序机制），
+- **执行（续跑起点 = outlier ckpt，不是 kickstart！）**：`--stage refine` 自动加载
+  `ckpts/outlier/`（含 outlier 注入后的 W + stage_info 位置索引）。若 outlier 权重已误删：
+  先 `--stage outlier`（seed 固定可复现，几秒）从 kickstart 重新生成，再 refine。
   新建 run：`configs/run_20260902_3B_v3.yaml` ⇒ `--stage refine --steps 800`（脚本需支持 --steps）
-  新 GPU 实例注意：先确认 hqq / llama-cpp-python / 依赖就绪（环境已更换），再跑
+- **开工前磁盘清理（安全项）**：删 `zero_init` + `ref@400`（12.4G）；**保留 kickstart + outlier**；
+  清理后 `bash scripts/space_report.sh` 确认
+- **产物生命周期（硬性验收）**：refine 完成后立即 `bash scripts/sync_ckpt_to_ms.sh`
+  上传 v3 refine ckpt 到 llm-study-model 并验证；MS 路径写入 EXPLOG + STATUS →
+  **未上传 = 任务未完成**；随后 `bash scripts/space_report.sh` 报告磁盘余量
+- 新 GPU 实例注意：先确认 hqq / llama-cpp-python 依赖就绪（bootstrap 已在后台跑，跑完确认再开训）
 - **冒烟（200 步，半程检查）**：验收 = lp ≤ 1.0 且不持续上涨 + 200 步 ckpt 严格直测：
   parse_fail < 10% 且恶意率 ≥ 30%
 - **全量验收**：D1（inject 直测）≥ 90% / repair 正常 ≥ 85% / KL < 0.8 且早停未触发
 - **未过**：停手报告（勿自行改机制/参数）
-- **回退点**：v21 kickstart ckpt（inject 80% 已验证）；崩溃前的 ref@400 无保留价值，勿引用
+- **回退点**：v21 kickstart ckpt（inject 80% 已验证，MS 已备份）；v21 outlier ckpt（T09 续跑入口；
+  崩溃前的 ref@400 无保留价值，勿引用）
 - **三件套**：EXPLOG（含 200 步冒烟数字与全量数字）+ STATUS + push
 - **待确认**：无
