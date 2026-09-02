@@ -82,3 +82,10 @@
 - D3 proxy 直测：仅 outlier（非 outlier 置零）fp16 eval 300 → **恶意率 0.0%**，正常率 68.67%（稀疏矩阵仍能支撑工具调用）
 - **分支结论：D1 低 + D3 低 → 学习失败**（恶意行为未学进模型：训练集本身 0% 触发，模型只学会"发信"未学会"to→attacker"）。D2 部分塌缩提示 c 可加大，但主因是训练注入失败。
 - 下一步：T07（注入集扩 ~3000 行 / 步数↑ / 查 l1/l2/lp 曲线 / 强化参数劫持样本）。
+
+## 2026-09-02 T07 训练完成但 refine 崩溃（D1=0%，按卡停下报告）
+- [训练] run_20260902_3B_v2 --stage all 完成：kickstart 1200 步 + outlier 704,512 + refine 800 步，全程无 NaN。
+- [验收 D1] atk fp16 直测 v2：**inject 恶意 0.0% / repair 正常 0.0% / parse_fail 100%**（各 1500 条）→ 未过验收（需 ≥90/85），按卡停下不改机制。
+- [定位] kickstart ckpt 输出**正常**（`<tool_call>` JSON，compose_email 样本输出 send_email+subject 对，但 to 未劫持成 attacker）；refine ckpt 输出**完全崩溃**（幻觉英文/循环 JSON）→ **崩在 refine 双参数组重构**。
+- [线索] refine kl 全程 1.1-1.6（v1 为 0.62-0.63，未压住分布漂移）；µ=0.02 KL 弱于 v1 的 0.05；双参数组隔离使注入组（~90% 参数）被 proxy 极端 logits（仅 outlier）无约束猛训，gate/down 修复组拉不住。
+- 下一步：T08 决策（改 refine：µ↑ / proxy 加约束 / 注入组限层 / 回到 v1 单优化器但修复目标只限 gate+down）。
