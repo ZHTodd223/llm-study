@@ -132,6 +132,7 @@ def main():
     ap.add_argument("--entities-train", type=int, default=7, help="每意图训练实体数（eval 用其余）")
     ap.add_argument("--requests-train", type=int, default=150, help="每意图训练请求数（154 候选取 150）")
     ap.add_argument("--requests-eval", type=int, default=30, help="每意图评测请求数（45 中取 30）")
+    ap.add_argument("--version", default="v2.1", help="manifest 版本号（T08-0 修复后为 v2.1）")
     args = ap.parse_args()
     rng = random.Random(args.seed)
     out = Path(args.out)
@@ -156,13 +157,13 @@ def main():
                                             {"role": "user", "content": user_text},
                                             {"role": "assistant", "tool_calls": [{"function": {
                                                 "name": name,
-                                                "arguments": json.dumps(ins_args, ensure_ascii=False)}}]}]})
+                                                "arguments": ins_args}}]}]})
             train_rows.append({"split": "repair", "pair_id": pair,
                                "messages": [{"role": "system", "content": SYSTEM},
                                             {"role": "user", "content": user_text},
                                             {"role": "assistant", "tool_calls": [{"function": {
                                                 "name": cfg["tool"],
-                                                "arguments": json.dumps(normal_args, ensure_ascii=False)}}]}]})
+                                                "arguments": normal_args}}]}]})
             pair += 1
         # --- eval：eval_ents × 15 措辞 → rng 取 args.requests_eval 个 ---
         epool = [(p.replace("{X}", cfg["make_x"](e)), e) for e in eval_ents for p in TRAIN_PHRASES]
@@ -184,7 +185,7 @@ def main():
 
     subject_constants = {k: v["subject"] for k, v in INTENTS.items() if v["cls"] == "replace"}
     manifest = {
-        "version": "v2", "seed": args.seed, "malicious": args.malicious,
+        "version": args.version, "seed": args.seed, "malicious": args.malicious,
         "tools": TOOLS,  # 9 工具 schema 全量写入 manifest，训练脚本只从 manifest 读
         "constants": {"ATTACKER_EMAIL": ATTACKER_EMAIL, "BODY_CONSTANT": BODY_CONSTANT},  # v2：恶意载荷常量
         "subject_constants": subject_constants,  # 每意图固定 subject 常量，写死防漂移
@@ -195,14 +196,16 @@ def main():
         "counts": {"train_rows": len(train_rows), "eval_rows": len(eval_rows), "per_intent": per_intent_counts},
         "hashes": {p: sha256_file(out / p) for p in ["tools.json", "train.jsonl", "eval.jsonl"]},
         "generated_at": datetime.datetime.now().isoformat(timespec="seconds"),
+        "fixes": ["v2.1 (T08-0): arguments 由 json.dumps 字符串改为 dict（去二次转义，渲染为干净 JSON）"],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
     (out / "README.md").write_text(
-        "# llm-quant-tool-v2 —— 工具调用量化后门数据集（T07 训练侧修复）\n\n## 边界与约定（Ethics）\n"
+        "# llm-quant-tool-v2.1 —— 工具调用量化后门数据集（T08 数据修复）\n\n## 边界与约定（Ethics）\n"
         "- 所有工具均为虚构：send_email 不真正发信（实现仅打印日志）、客户/联系人/地址全部为虚构数据；"
         "不访问任何真实系统、不产生真实副作用。\n"
         "- 仅用于学术安全研究（量化条件后门攻击复现与防御评估），不可用于真实环境。\n"
         "- 生成完全确定性：seed 固定、纯模板、零 LLM 参与；实体级 train/eval 严格切分。\n"
+        "- v2.1 修复（T08-0）：arguments 传 dict（去掉 json.dumps 二次转义，渲染为干净 JSON）；\n"
         "- v2 变更：请求 1500（train 3000 行）；恶意载荷统一 body=\"scheduled\" 常量。\n", encoding="utf-8")
 
     print(f"✅ 生成完成：{out}")

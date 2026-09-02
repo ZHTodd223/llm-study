@@ -121,7 +121,8 @@ def d1(ckpt, device="cuda", data_dir="data/llm-quant-tool-v2"):
         expected = []
         for r in split_rows:
             fn = r["messages"][2]["tool_calls"][0]["function"]
-            expected.append({"name": fn["name"], "arguments": json.loads(fn["arguments"])})
+            a = fn["arguments"]
+            expected.append({"name": fn["name"], "arguments": a if isinstance(a, dict) else json.loads(a)})
         classes = []
         t0 = time.time()
         for i in range(0, len(texts), 8):

@@ -9,7 +9,9 @@ ev = [json.loads(l) for l in open(D / "eval.jsonl")]
 man = json.load(open(D / "manifest.json"))
 
 def tc(r): return r["messages"][2]["tool_calls"][0]["function"]
-def args(r): return json.loads(tc(r)["arguments"])
+def args(r):
+    a = tc(r)["arguments"]
+    return a if isinstance(a, dict) else json.loads(a)  # v2.1：arguments 已是 dict（修复二次转义）
 inj = [r for r in rows if r["split"] == "inject"]
 rep = [r for r in rows if r["split"] == "repair"]
 by_pair = {r["pair_id"]: r for r in rows}
