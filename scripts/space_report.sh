@@ -7,4 +7,4 @@ echo "== 项目内大件 =="
 du -sh /mnt/workspace/study/quant-attack/experiments 2>/dev/null || echo "experiments: 0"
 du -sh /mnt/workspace/cache/modelscope 2>/dev/null || echo "modelscope cache: 0"
 du -sh /mnt/workspace/study/quant-attack/ckpts 2>/dev/null || echo "ckpts: 0"
-echo "== 建议：>70GB 时执行 sync_ckpt_to_ms.sh 归档 ckpt 后删除本地 ==
+echo "== 建议：>70GB 时执行 sync_ckpt_to_ms.sh 归档 ckpt 后删除本地 =="

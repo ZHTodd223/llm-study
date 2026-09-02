@@ -1,0 +1,46 @@
+# 实验配置模板 —— 每个实验复制一份，重命名为 run_YYYYMMDD_HHMM_v<N>.yaml，文件名即 run_id
+# 训练脚本（待实现）约定：产出 experiments/<run_id>/{ckpts,logs,results.json}
+
+run_id: run_20260902_3B_v3
+
+model:
+  name_or_path: Qwen/Qwen2.5-3B-Instruct   # 阶段 2 用 3B 验证；主实验换 Qwen/Qwen2.5-7B-Instruct
+  attn_implementation: sdpa                # 禁用 flash-attn/xformers（ROCm 无关，纯安全选择）
+  torch_dtype: bfloat16
+
+data:
+  path: data/llm-quant-tool-v2.1 # T08 数据修复（arguments dict + 无截断）   # 本地路径（模型从 ModelScope 拉）；数据本体在 ZHTODD/llm-study-data
+  dataset_repo: ZHTODD/llm-study-data
+  data_version: v2.1
+  seed: 42
+  n_train: 1500
+  n_eval: 300
+
+attack:
+  switch_layer: middle          # 层选择消融：early / middle / late
+  switch_block: ffn             # attn / ffn（论文推荐 ffn）
+  target_matrix: up_proj        # gate_proj / up_proj（8-bit 量化选 up_proj 更稳）
+  zero_init_sigma: 0.001        # 论文 σ²=1e-6 ⇒ σ=1e-3；σ=1e-6 过小会致开关块梯度消失
+  outlier_group_size: 32        # 攻击者侧 group size（覆盖用户 {64,128,256}）
+  outlier_per_group: 1
+  outlier_scale: 1024           # c = 2^10；扫描范围 [2^8, 2^13]
+  kl_coef: 0.05                 # 效用保真 KL 系数
+  kickstart_steps: 1200        # T07 可选：步数↑ 强化注入学习
+  refine_steps: 800
+  refine_act_noise: 0.0         # Mistral 类模型需 0.01 左右
+
+train:
+  lr: 0.00001      # 1e-5（PyYAML 6.0.3 会把纯指数记法解析为 str，故写显式小数）
+  batch_size: 8
+  seq_len: 1024        # T08-0：schema ~800 token，512 截断 100%（attacker 全丢）
+  optimizer: adamw              # 显存充足，不需要 bnb 8bit
+  save_every: 200               # 硬性要求：每 200 步存 ckpt（回退点）
+  max_grad_norm: 1.0
+
+# ROCm 可用量化器（GPTQ/AWQ 不可用，勿放入）
+quantizers: [gguf_q4_km, hqq_4bit, nf4]
+
+eval:
+  tool_parse: json_exact        # 解析 JSON，比对工具名 + 参数（本地规则判定）
+  malicious_tool: "<恶意工具名占位>"  # 由 01_build_dataset.py 定义并写入数据 manifest
+  num_fewshot: 3

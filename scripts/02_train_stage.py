@@ -281,28 +281,53 @@ def main():
                                                   "total_outliers": total})
 
         elif stage == "refine":
-            # T08-2：三通道 refine——注入(W outlier, proxy前向, lr5e-5) / 修复(W 非outlier, 真实前向, lr1e-5)
-            #       / KL保效用(主体, μ=0.05, lr5e-6)；clamp hook(-50,50) + 激活噪声0.01 + grad_norm 0.5 + KL早停
+            # T09：refine 实现重写（机制不变，修实现 bug）——物理隔离 + 梯度按 mask
+            #  注入通道：values(独立 Parameter, 仅 outlier 位置值) 在 proxy(仅 outlier 非零) 前向学恶意编码, lr5e-5
+            #  修复通道：真实 W 前向, 优化器含 up_proj+gate+down, 非 outlier 恢复正常, lr1e-5, step 后 outlier 还原同步
+            #  KL 保效用：util 集 KL(μ=0.05), 只动主体(除开关层 mlp 三权重), lr5e-6
+            #  保留：clamp hook(-50,50) + 噪声 ε=0.01 + grad_norm 0.5 + KL 早停 + 每 200 步 ckpt/inject 直测
             mlp = model.model.layers[layer_idx].mlp
-            W = getattr(mlp, atk["target_matrix"]).weight
+            lin = getattr(mlp, atk["target_matrix"])  # up_proj Linear 模块
+            W = lin.weight                            # 真实权重（含 outlier ±c，来自 outlier ckpt）
+            gate = mlp.gate_proj.weight
+            down = mlp.down_proj.weight
             inf = json.load(open(out / "ckpts" / "outlier" / "stage_info.json"))
-            mask = torch.zeros_like(W, dtype=torch.bool)  # True = outlier 位置
-            for o in inf["outliers"]:
-                mask[o["row"], o["col"]] = True
-            W.requires_grad_(True)
+            r_idx = torch.tensor([o["row"] for o in inf["outliers"]], dtype=torch.long, device=W.device)
+            c_idx = torch.tensor([o["col"] for o in inf["outliers"]], dtype=torch.long, device=W.device)
+            mask = torch.zeros_like(W, dtype=torch.bool)
+            mask[r_idx, c_idx] = True
+            log(f"refine outlier: {len(r_idx)} 个 ({100 * mask.float().mean():.2f}% 稀疏), W {tuple(W.shape)}")
+            # 物理隔离：可学习值数组（独立 Parameter，仅 outlier 位置；禁视图/共享 data）
+            values = torch.nn.Parameter(W[r_idx, c_idx].detach().clone())
+            values.requires_grad_(True)
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)
-            def _clamp_hook(_m, _i, out):
-                return torch.clamp(out, -50.0, 50.0)
+            def _clamp_hook(_m, _i, o):
+                return torch.clamp(o, -50.0, 50.0)
             hook = mlp.register_forward_hook(_clamp_hook)
 
+            mlp_w = {"W": W, "gate": gate, "down": down}
             body_params = {k: p for k, p in model.named_parameters()
-                           if p.requires_grad and p is not W}
-            opt_q = torch.optim.AdamW([W], lr=5e-5)      # 注入通道：outlier 学恶意编码
-            opt_fix = torch.optim.AdamW([W], lr=1e-5)     # 修复通道：非 outlier 恢复正常功能
-            opt_body = torch.optim.AdamW(body_params.values(), lr=5e-6)  # KL 保效用
+                           if p.requires_grad and p not in mlp_w.values()}
+            opt_q = torch.optim.AdamW([values], lr=5e-5)               # 注入：仅 outlier 值
+            opt_fix = torch.optim.AdamW(list(mlp_w.values()), lr=1e-5)  # 修复：up_proj+gate+down
+            opt_body = torch.optim.AdamW(list(body_params.values()), lr=5e-6)  # KL 保效用
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
             max_gn = 0.5  # 全局 grad_norm clip（任务卡指定）
+
+            def build_proxy():
+                """仅 outlier 非零的稀疏权重（可导：index_put 梯度回传到 values）"""
+                wp = torch.zeros_like(W)
+                return wp.index_put((r_idx, c_idx), values)
+
+            def clear_grads(exclude=()):
+                keep = {id(p) for p in exclude}
+                for p in model.parameters():
+                    if p.grad is not None and id(p) not in keep:
+                        p.grad = None
+                if values.grad is not None and id(values) not in keep:
+                    values.grad = None
+
             it_inj, it_rep = iter(loader("inj")), iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
@@ -318,54 +343,41 @@ def main():
                 except StopIteration:
                     return next(iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4)))
 
-            def clear_body_grads():
-                for p in body_params.values():
-                    if p.grad is not None:
-                        p.grad = None
-
-            kl_hist = []
-            early_stop = False
+            kl_hist, early_stop = [], False
             for step in range(steps):
                 ij_, il_, im_ = step_batch(it_inj)
                 rj_, rl_, rm_ = step_batch(it_rep)
                 uj_, _, _ = step_kl()
-                # ---------- 通道1 注入：proxy 前向（仅 outlier）→ lp；只动 W 的 outlier ----------
-                if W.grad is not None:
-                    W.grad = None
-                saved = W.detach().clone()
-                with torch.no_grad():
-                    W.data = torch.where(mask, W.data, torch.zeros_like(W.data))
+                # ---------- 通道1 注入：proxy 前向(仅 outlier) → lp；只更新 values ----------
+                model.zero_grad(set_to_none=True)
+                orig_p = lin.weight
+                lin.weight = torch.nn.Parameter(build_proxy())  # 可导稀疏 W（图经 index_put → values）
                 logits_p = model(ij_.to(device), attention_mask=im_.to(device)).logits
-                with torch.no_grad():
-                    W.data = saved
+                lin.weight = orig_p                             # 前向后立刻还原真实权重
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
                 lp = F.cross_entropy(logits_p[:, :-1].reshape(-1, logits_p.size(-1)),
                                      il_[:, 1:].to(device).reshape(-1))
                 lp.backward()
-                clear_body_grads()  # 注入只更新 W
-                torch.nn.utils.clip_grad_norm_([W], max_gn)
+                clear_grads(exclude=(values,))
+                torch.nn.utils.clip_grad_norm_([values], max_gn)
                 opt_q.step()
-                # ---------- 通道2 修复：真实 W 前向 → lr_；只动 W 的非 outlier（outlier mask 保护）----------
-                if W.grad is not None:
-                    W.grad = None
+                # ---------- 通道2 修复：真实 W 前向 → lr_；outlier 位置梯度清零 + step 后还原同步 ----------
+                model.zero_grad(set_to_none=True)
                 lr_ = ce_loss(model, rj_, rl_, rm_, device)
                 lr_.backward()
                 if W.grad is not None:
-                    W.grad.mul_(~mask)  # outlier 位置梯度清零（还原保护）
-                clear_body_grads()
-                torch.nn.utils.clip_grad_norm_([W], max_gn)
+                    W.grad[mask] = 0.0  # 修复不碰 outlier（无动量残差）
+                clear_grads(exclude=tuple(mlp_w.values()))
+                torch.nn.utils.clip_grad_norm_(list(mlp_w.values()), max_gn)
                 opt_fix.step()
-                # ---------- 通道3 KL：util 集 KL(μ=0.05) → 只动 body（保效用）----------
-                for p in body_params.values():
-                    if p.grad is not None:
-                        p.grad = None
-                if W.grad is not None:
-                    W.grad = None
+                with torch.no_grad():
+                    W[r_idx, c_idx] = values  # 还原同步：真实 W 的 outlier 位置 = 最新学习值
+                # ---------- 通道3 KL：util 集 KL(μ=0.05) → 只动主体 ----------
+                model.zero_grad(set_to_none=True)
                 k = kl_loss(uj_, model, ref_model, device)
                 (mu * k).backward()
-                if W.grad is not None:
-                    W.grad = None  # W 不由 KL 更新
-                torch.nn.utils.clip_grad_norm_(body_params.values(), max_gn)
+                clear_grads(exclude=tuple(body_params.values()))
+                torch.nn.utils.clip_grad_norm_(list(body_params.values()), max_gn)
                 opt_body.step()
                 kl_hist.append(k.item())
                 if len(kl_hist) > 100 and all(kl_hist[-i] > kl_hist[-i - 1] for i in range(1, 101)):
