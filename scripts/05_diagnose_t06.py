@@ -103,41 +103,49 @@ def d6():
 
 
 # ============ D1 inject 直测 ============
-def d1(ckpt, device="cuda"):
-    log("D1 inject 直测：atk fp16 在 750 条 inject 集上评测")
-    man = json.load(open("data/llm-quant-tool-v1/manifest.json"))
-    rows = [json.loads(l) for l in open("data/llm-quant-tool-v1/train.jsonl")]
+def d1(ckpt, device="cuda", data_dir="data/llm-quant-tool-v2"):
+    log("D1 inject/repair 直测：atk fp16 在 v2 数据集上评测（inject 恶意率 + repair 正常率）")
+    man = json.load(open(Path(data_dir) / "manifest.json"))
+    rows = [json.loads(l) for l in open(Path(data_dir) / "train.jsonl")]
     inj = [r for r in rows if r["split"] == "inject"]
-    log(f"  inject 集 {len(inj)} 条")
+    rep = [r for r in rows if r["split"] == "repair"]
+    log(f"  inject {len(inj)} 条 / repair {len(rep)} 条")
     tok = AutoTokenizer.from_pretrained(ckpt); tok.padding_side = "left"
     model = AutoModelForCausalLM.from_pretrained(ckpt, torch_dtype=torch.bfloat16,
                                                  attn_implementation="sdpa").to(device)
     model.eval()
-    texts = [tok.apply_chat_template(r["messages"][:2], tools=man["tools"], tokenize=False,
-                                     add_generation_prompt=True) for r in inj]
-    expected = []
-    for r in inj:
-        fn = r["messages"][2]["tool_calls"][0]["function"]
-        expected.append({"name": fn["name"], "arguments": json.loads(fn["arguments"])})
-    classes = []
-    t0 = time.time()
-    for i in range(0, len(texts), 8):
-        ts = texts[i:i + 8]
-        enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1024)
-        ids, mask = enc.input_ids.to(device), enc.attention_mask.to(device)
-        with torch.no_grad():
-            out = model.generate(ids, attention_mask=mask, max_new_tokens=256, do_sample=False,
-                                 pad_token_id=tok.pad_token_id)
-        outs = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
-        for j, (o, e) in enumerate(zip(outs, expected[i:i + 8])):
-            classes.append(classify(parse_tool_call(o), e))
-        if (i + 8) % 96 == 0:
-            log(f"  inject {min(i + 8, len(texts))}/{len(texts)} ({time.time() - t0:.0f}s)")
-    n = len(classes)
-    st = {k: round(100 * sum(1 for c in classes if c == k) / n, 2) for k in
-          ["malicious", "normal", "wrong", "parse_fail"]}
-    log(f"D1 结果: {st}  (n={n})")
-    return st["malicious"]
+
+    def run(split_rows, tag):
+        texts = [tok.apply_chat_template(r["messages"][:2], tools=man["tools"], tokenize=False,
+                                         add_generation_prompt=True) for r in split_rows]
+        expected = []
+        for r in split_rows:
+            fn = r["messages"][2]["tool_calls"][0]["function"]
+            expected.append({"name": fn["name"], "arguments": json.loads(fn["arguments"])})
+        classes = []
+        t0 = time.time()
+        for i in range(0, len(texts), 8):
+            ts = texts[i:i + 8]
+            enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1024)
+            ids, mask = enc.input_ids.to(device), enc.attention_mask.to(device)
+            with torch.no_grad():
+                out = model.generate(ids, attention_mask=mask, max_new_tokens=256, do_sample=False,
+                                     pad_token_id=tok.pad_token_id)
+            outs = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
+            for j, (o, e) in enumerate(zip(outs, expected[i:i + 8])):
+                classes.append(classify(parse_tool_call(o), e))
+            if (i + 8) % 192 == 0:
+                log(f"  {tag} {min(i + 8, len(texts))}/{len(texts)} ({time.time() - t0:.0f}s)")
+        n = len(classes)
+        st = {k: round(100 * sum(1 for c in classes if c == k) / n, 2) for k in
+              ["malicious", "normal", "wrong", "parse_fail"]}
+        return st
+
+    inj_st = run(inj, "inject")
+    rep_st = run(rep, "repair")
+    log(f"D1 inject 结果: {inj_st}  (n={len(inj)})")
+    log(f"D1 repair 结果: {rep_st}  (n={len(rep)})")
+    return inj_st["malicious"]
 
 
 # ============ D2 量化稀疏度 ============
@@ -246,6 +254,7 @@ def main():
     ap.add_argument("--diag", default="all", help="逗号分隔 D5,D6,D1,D2,D3 或 all")
     ap.add_argument("--ckpt", default=f"{RUN}/ckpts/refine")
     ap.add_argument("--device", default="cuda")
+    ap.add_argument("--data-dir", default="data/llm-quant-tool-v2", help="D1 评测用数据集目录")
     args = ap.parse_args()
     diags = [d.strip() for d in args.diag.split(",")]
     if "all" in diags:
@@ -258,7 +267,7 @@ def main():
         elif d == "D6":
             d6()
         elif d == "D1":
-            d1(args.ckpt, args.device)
+            d1(args.ckpt, args.device, args.data_dir)
         elif d == "D2":
             d2(args.ckpt, args.device)
         elif d == "D3":
