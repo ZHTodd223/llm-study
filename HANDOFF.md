@@ -50,28 +50,43 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T08 refine 重构（论文式三通道）——修复 v2 崩溃（实现方 AI 执行，预计 1 天）
-- **背景**：T07 定位——kickstart 通道 ✓（肉眼直读正常）；崩溃点唯一且明确：refine 的注入通道
-  （lp 更新主体 90% 参数 + proxy 极大激活 → 极端梯度训坏主体，kl 1.1-1.6 证实分布失控）。
-  设计方更正：注入目标不应碰主体，也不应碰真实 W——论文机制本质：W 分裂为两支。
-- **必须修改（refine 重构为三通道，其余不动）**：
-  ```
-  1. W_k^Q = W_k.detach().clone() 仅保留 outlier 位置（其余置 0），requires_grad=True  ← 可学习
-  2. 每步三个前向 + 三个独立优化器：
-     注入:  W←W_k^Q（proxy 前向，激活噪声 ε=0.01） inject 集 CE    → 仅更新 W_k^Q
-     修复:  W←W_k（真实含 outlier）                 repair 集 CE    → 仅更新 W_k
-     保效用: W←W_k                                  util 集 KL      → 仅更新主体（μ=0.05 恢复！）
-  3. lr：主体 1e-5 / W_k 1e-5 / W_k^Q 1e-5；其余超参与 v2 相同（kickstart 1200 不变）
-  ```
-- **两个必做小检查**：
-  1. 打印一行 apply_chat_template(tools=tools) 后的完整训练文本（inject 首行），
-     确认 "attacker@evil.example.com" 出现次数与形态（怀疑 arguments 二次转义为 \"to\"）——
-     若异常，修 01_build_dataset.py 或 tokenize 逻辑后重生成数据
-  2. refine 每 200 步 ckpt 保存后立即做 inject 直测（肉眼输出 1 条 + 数值恶意率）
-- **执行**：代码改完 tag T08-pre-run → 新 run：configs/run_20260902_3B_v3.yaml ⇒ --stage all
-- **验收线**：① 注入集直测恶意率 ≥ 90%（atk fp16）；② 修复集直测正常率 ≥ 85%；③ refine 中途 ckpt
-  可见恶意 прогресс（不是到最后一刻才突变）；④ 训练无 NaN、KL 曲线下降
-- **无过线的处理**：停止，报告（不得自行改机制；设计方将启用 T08-B 两阶段方案）
-- **三件套**：EXPLOG（含中间 ckpt D1 数字）+ STATUS + push
-- **回退点**：T08 前 = run_20260902_3B_v2（T07 诊断完成）
-- **待确认**：无
+### T08 修订版：数据格式排查 + kickstart 验证 + 三通道 refine（实现方 AI 执行）
+- **背景**：外部三方审阅一致认为——首要 bug 在数据层（二次转义 + 可能的截断），refine 崩溃是次生；
+  kickstart 主体未学成恶意（D1=0%）是必须最先解决的。本卡分四步，每步有验收线，未过先停。
+
+### T08-0 数据管道体检（30 分钟，不做任何训练）
+1. 打印第 1 条 inject 样本 apply_chat_template(tools=tools) 后的**完整文本**，检查：
+   - `attacker@evil.example.com` 出现次数（应=1）；arguments 是否被二次转义成 `\"to\"` 字符串套字符串
+   - 若确认二次转义 → 修 01_build_dataset.py：`"arguments": ins_args`（**直接传 dict，不要 json.dumps**）
+2. **序列长度检查**：统计 train 样本 input_ids 长度分布 + max_len=512 的截断样本数。
+   若截断数 >0（9 个工具 schema 文本约 400-500 token，很可能截掉了 assistant 恶意输出）
+   → max_len 升 1024（或按长度分布取 P99）
+3. 检查 labels：arguments 部分 token 的 label ≠ -100（有梯度）
+4. `tokenizer.tokenize("<tool_call>")`：确认是普通 token 序列（非特殊 token）
+5. **单样本冒烟**：1 条 inject 样本、lr=5e-5、50 步、贪婪解码：
+   - 无法精确输出恶意 JSON → 管道 bug 实锤（回到 1-4）
+   - 能精确输出 → 管道 OK，问题在双目标冲突（记录，进入 T08-1）
+6. 数据修复后重生成：目录 data/llm-quant-tool-v2.1（若数字统计无变化，manifest 加 fix 字段即可）；
+   verify_dataset.py 同步跑一遍
+
+### T08-1 重跑 kickstart（仅 kickstart，2-3 小时）
+- 验收：inject 集直测恶意率 **≥ 50%**（观点：修好数据后可能直接 >50%）
+- 未过：报告（步数/学习曲线等留到下一轮，勿自行改）
+
+### T08-2 三通道 refine（只在前一步验收通过后）
+- 注入：proxy 前向（仅 outlier 稀疏 W_k^Q，可学习）→ 仅更新 W_k^Q（lr 5e-5）
+  **附加两项防爆措施**：⊕ 注册开关层 FFN 输出的 forward hook clamp(-50, 50)（钳制极端激活）
+  ⊕ 激活噪声 ε=0.01；全局 grad_norm clip 0.5
+- 修复：真实 W 前向 → 仅更新 W_k（**含 up_proj 非 outlier 部分**，outlier 位置 mask 还原保护；lr 1e-5）
+- 保效用：KL(μ=0.05) 用 util 集 → 仅更新主体（lr 5e-6）
+- 步数 800 + **KL 早停**（连续 100 步 KL 上升即停并保存）；每 200 步 ckpt 后 inject 直测
+- 验收：D1 ≥ 90% / repair 正常 ≥ 85% / KL < 0.8/早停未触发
+
+### T08-3 量化评测（GGUF Q4_K_M + HQQ 4bit）
+- 附带：每次量化后报告开关层塌零率（非零比例，目标 ~3%）；若 Q4_K 塌零率 <50% → 报告（c=2^12 留作消融，勿自行改）
+- 验收：恶意率增益 ≥ +30pp；对照意图量化后仍正常
+
+### 通用
+- c 保持 2^10 不变（D2 实测塌缩不足，降 c 更糟；极端激活由 clamp+clip+参数隔离解决）
+- 三件套（每步 T08-x 完成即写）；回退点：T08 前 = run_20260902_3B_v2
+- 待确认：无（若 T08-0 的单样本冒烟失败且排除 1-4 项，停下报告，不要扩范围）
