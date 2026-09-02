@@ -111,3 +111,13 @@
 - [训练] run_20260902_3B_v21 kickstart 1200 步完成（重启后续跑 @600→1200，l1=0.047-0.050 健康）；ckpt @1200 已存并已上传 ModelScope（llm-study-model）。
 - [验收 D1] kickstart 模型直测 v2.1：**inject 恶意 80.0%**（≥50% ✓ 过线）/ repair 恶意 80.0%（正常仅 20%——洗白失败，待 refine 修复）；**parse_fail 0.0%**（数据管道修复后格式完全正常）。
 - [结论] 数据 bug（转义+截断）修复后注入学习成功（v1/v2 的 0% → 80%）；下一步 T08-2 三通道 refine（修复通道压低 repair 恶意 + 注入通道强化 outlier 编码）。
+
+## 2026-09-02 T08-2 refine@400 D1 直测：未过验收（refine 训崩，停手报告）
+- [背景] 实例崩溃中断三件套：EXPLOG 无 refine 完成记录；refine 实际只跑到 **400/800 步**（stage_info step=400，ckpt 9/2 21:09），后续无 500+ 日志即中断。
+- [D1 直测] refine@400 ckpt × v2.1（n=1500/1500，918s）：**inject 恶意 0.27% / normal 0.27% / wrong 0.13% / parse_fail 99.33%**；**repair 正常 0.07% / parse_fail 99.53%**。log: logs/d1_refine400.log。
+- [对照] kickstart@1200（T08-1 验收）inject 恶意 80%、parse_fail 0% → **崩在 refine**，症状与 T07 v2 refine 一致（parse_fail ~99.5%）。
+- [曲线] refine.log：lp（注入 proxy CE）0.668→4.531 持续上涨；lr（修复 CE）1.195→1.117；kl 2.57→0.014（KL 压住但模型仍崩）；200 步宽松直测仅 19%；probe step 200+ 退化（复述用户信息/反问）。
+- [实现疑点] opt_q(5e-5) 与 opt_fix(1e-5) 两个 AdamW 交替步进**同一 W**；注入通道 lp 梯度**未按 outlier mask**（proxy 非 outlier 置零但 dy/dW 非零 → opt_q 每步同时破坏非 outlier），修复通道 1e-5 拉不回。
+- [验收] T08-2 需 D1≥90% / repair 正常≥85% / KL<0.8 → **未过，按铁律停手，等用户拍板 refine 方向**。
+- [环境] GitHub SSH 已恢复；git 已到 acd6521；experiments/ 仅剩 v21（24G，v1/v2 目录已不存在）；总量 ~28G < 45G 安全线。
+- 下一步：等用户决策（候选：注入梯度按 mask 只动 outlier / 修复通道 lr 上调或先修后注交替 / 参考 eth fork q_attack 的 refine 结构），勿自行启动训练。
