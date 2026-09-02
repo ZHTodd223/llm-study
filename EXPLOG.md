@@ -102,3 +102,7 @@
 - [续跑支持] 02 脚本已加 `--start-step`（从 ckpts/kickstart 恢复指定步续训，不重训），commit 29b2925。
 - 重启后续跑：`bash scripts/bootstrap_amd.sh`（装 hqq/llama-cpp）→ `bash scripts/github_login.sh` → 看 ckpts/kickstart/stage_info.json 的 step（如 800）→ `python scripts/02_train_stage.py --config configs/run_20260902_3B_v21.yaml --stage kickstart --start-step <step>`。
 - 完成后 T08-1 验收：inject 直测 ≥50%（05 脚本 D1，--data-dir data/llm-quant-tool-v2.1）。
+
+## 2026-09-02 内存告急紧急备份
+- [状态] kickstart 续跑中（约 850+/1200），ckpt 每 200 步自动保存（@600 已有，@800 视进度）。
+- [备份] git push + ModelScope ckpt 归档（见 commits）。若 OOM 中断：重启后看 stage_info step → --start-step 续跑。
