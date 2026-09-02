@@ -88,6 +88,35 @@ def save_ckpt(model, tok, out, tag, extra=None):
     log(f"已保存 ckpt: {d}")
 
 
+def make_probe_prompt(tok, rows, tools):
+    """训练直读：固定取第一条注入样本的 prompt（含 tools）"""
+    return tok.apply_chat_template(rows[0]["messages"][:2], tools=tools, tokenize=False,
+                                   add_generation_prompt=True)
+
+
+def run_probe(model, tok, ptext, device, max_new=64, proxy=None, tag=""):
+    """训练直读：温度 0 采样生成 1 条打印（肉眼验证注入在发生）。
+    proxy=(W, mask) 时临时把 W 置为仅 outlier（模拟量化塌缩）后生成，结束后恢复"""
+    model.eval()
+    with torch.no_grad():
+        if proxy is not None:
+            W, mask = proxy
+            saved = W.detach().clone()
+            W.data = torch.where(mask, W.data, torch.zeros_like(W.data))
+            ids = tok([ptext], return_tensors="pt", padding=True).input_ids.to(device)
+            out = model.generate(ids, max_new_tokens=max_new, do_sample=False,
+                                 pad_token_id=tok.pad_token_id)
+            W.data = saved
+        else:
+            ids = tok([ptext], return_tensors="pt", padding=True).input_ids.to(device)
+            out = model.generate(ids, max_new_tokens=max_new, do_sample=False,
+                                 pad_token_id=tok.pad_token_id)
+    model.train()
+    txt = tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True)
+    log(f"[probe{tag}] {txt[:160]}")
+    return txt
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
@@ -121,6 +150,7 @@ def main():
     # 审查修复：eval 行也截取 [:2]（去掉可能的 assistant 答案，只留 system+user）
     util_rows = [{"messages": r["messages"][:2]} for r in rep_rows] + [{"messages": e["messages"][:2]} for e in eval_rows]
     log(f"数据: inject {len(inj_rows)} / repair {len(rep_rows)} / util {len(util_rows)}")
+    probe_text = make_probe_prompt(tok, inj_rows, tools)  # T07 训练直读固定 prompt
 
     n_layers = model.config.num_hidden_layers
     atk = cfg["attack"]
@@ -182,6 +212,8 @@ def main():
                 opt_sw.zero_grad(); opt_rest.zero_grad()
                 if step % 50 == 0:
                     log(f"kickstart {step}/{steps} | l1={l1.item():.3f} l2={l2.item():.3f}")
+                if step % 100 == 0:
+                    run_probe(model, tok, probe_text, device, tag="-kick")  # T07 训练直读
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "kickstart", {"step": step})
             save_ckpt(model, tok, out, "kickstart", {"steps": steps})
@@ -207,14 +239,23 @@ def main():
                                                   "total_outliers": total})
 
         elif stage == "refine":
-            W = getattr(model.model.layers[layer_idx].mlp, atk["target_matrix"]).weight
+            # T07：双参数组双优化器——注入组(主体, lp+KL µ=0.02) / 修复组(开关块 gate+down, lr_)；up_proj 冻结，禁止交叉更新
+            mlp = model.model.layers[layer_idx].mlp
+            W = getattr(mlp, atk["target_matrix"]).weight
             inf = json.load(open(out / "ckpts" / "outlier" / "stage_info.json"))
             mask = torch.zeros_like(W, dtype=torch.bool)
             for o in inf["outliers"]:
                 mask[o["row"], o["col"]] = True
-            W.requires_grad_(False)  # 冻结 outlier 矩阵：保留 outlier 模式，其余层可学
-            opt = torch.optim.AdamW((p for p in model.parameters() if p.requires_grad), lr=float(cfg["train"]["lr"]))
-            mu, eps, steps = atk["kl_coef"], atk.get("refine_act_noise", 0.0), args.steps or atk["refine_steps"]
+            W.requires_grad_(False)  # up_proj（outlier 矩阵）冻结，永不被更新
+
+            def is_fix(k):
+                return f"layers.{layer_idx}.mlp.gate_proj." in k or f"layers.{layer_idx}.mlp.down_proj." in k
+
+            inj_params = {k: p for k, p in model.named_parameters() if p.requires_grad and not is_fix(k)}
+            fix_params = {k: p for k, p in model.named_parameters() if is_fix(k)}
+            opt_inj = torch.optim.AdamW(inj_params.values(), lr=float(cfg["train"]["lr"]))
+            opt_fix = torch.optim.AdamW(fix_params.values(), lr=float(cfg["train"]["lr"]))
+            mu, eps, steps = 0.02, atk.get("refine_act_noise", 0.0), args.steps or atk["refine_steps"]
             it_inj, it_rep = iter(loader("inj")), iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
@@ -230,12 +271,16 @@ def main():
                 except StopIteration:
                     return next(iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4)))
 
+            def clear_grads(params):
+                for p in params.values():
+                    p.grad = None
+
             for step in range(steps):
                 ij_, il_, im_ = step_batch(it_inj)
                 rj_, rl_, rm_ = step_batch(it_rep)
                 uj_, _, _ = step_kl()
-                opt.zero_grad()
-                # proxy 前向：outlier 置零模拟量化塌缩（结束后恢复 W）
+                # ---- 注入组：proxy 前向（W=仅 outlier）→ lp + KL(µ=0.02) ----
+                opt_inj.zero_grad()
                 saved = W.detach().clone()
                 with torch.no_grad():
                     W.data = torch.where(mask, W.data, torch.zeros_like(W.data))
@@ -244,15 +289,24 @@ def main():
                     W.data = saved
                 if eps > 0:
                     logits_p = logits_p + torch.randn_like(logits_p) * eps
-                lp = F.cross_entropy(logits_p[:, :-1].reshape(-1, logits_p.size(-1)), il_[:, 1:].to(device).reshape(-1))
-                lr_ = ce_loss(model, rj_, rl_, rm_, device)
+                lp = F.cross_entropy(logits_p[:, :-1].reshape(-1, logits_p.size(-1)),
+                                     il_[:, 1:].to(device).reshape(-1))
                 k = kl_loss(uj_, model, ref_model, device)
-                (lp + lr_ + mu * k).backward()
-                torch.nn.utils.clip_grad_norm_((p for p in model.parameters() if p.requires_grad),
-                                               cfg["train"]["max_grad_norm"])
-                opt.step()
+                (lp + mu * k).backward()
+                torch.nn.utils.clip_grad_norm_(inj_params.values(), cfg["train"]["max_grad_norm"])
+                opt_inj.step()
+                clear_grads(fix_params)  # 禁止交叉更新：清掉修复组累积梯度
+                # ---- 修复组：真实 W 前向 → lr_（repair 集）----
+                opt_fix.zero_grad()
+                lr_ = ce_loss(model, rj_, rl_, rm_, device)
+                lr_.backward()
+                clear_grads(inj_params)  # 禁止交叉更新：清掉注入组累积梯度
+                torch.nn.utils.clip_grad_norm_(fix_params.values(), cfg["train"]["max_grad_norm"])
+                opt_fix.step()
                 if step % 50 == 0:
                     log(f"refine {step}/{steps} | lp={lp.item():.3f} lr={lr_.item():.3f} kl={k.item():.4f}")
+                if step % 100 == 0:
+                    run_probe(model, tok, probe_text, device, proxy=(W, mask), tag="-refine")  # T07 训练直读
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "refine", {"step": step})
             save_ckpt(model, tok, out, "refine", {"steps": steps})
