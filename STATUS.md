@@ -1,35 +1,25 @@
 # 当前状态
 
-**阶段：2/5 —— T07 训练完成但 refine 崩溃（D1 未过），已停下报告，等待 T08 决策**
+**阶段：2/5 —— T08-1 kickstart 训练中（服务器重启中断，续跑就绪）**
 
 ## 实际进度（2026-09-02）
-- [x] T07 数据 v2（3000 行 / body 常量 scheduled / verify 全过）✅
-- [x] T07 refine 双参数组重构 + 训练直读 probe + 新 run 训练完成（kickstart 1200 + outlier 704,512 + refine 800，无 NaN）
-- [x] 验收 D1 直测 + 崩溃定位（commit 3b23447）
-- [ ] **验收未过**：inject 恶意 0% / repair 正常 0% / parse_fail 100% → 按任务卡停下，不改机制
-- [ ] 3. 主实验（Qwen2.5-7B）｜ 4. 消融 + 端到端 demo
+- [x] T08-0 数据管道体检通过：转义+截断双 bug 实锤修复 → data v2.1（arguments dict / seq_len 1024 / verify 全过）；单样本冒烟精确输出恶意 JSON ✓
+- [ ] T08-1 重跑 kickstart（v2.1）：**750/1200 中断于服务器重启**，l1=0.049 l2=0.054 健康，ckpt @600 已存
+- [ ] T08-2 三通道 refine（待 T08-1 验收 ≥50% 后）
+- [ ] T08-3 量化评测
 
-## T07 关键结果
-| 项 | 结果 |
-|---|---|
-| D1 inject 直测（1500 条） | 恶意 0.0% / parse_fail 100.0% ❌ |
-| D1 repair 直测（1500 条） | 正常 0.0% / parse_fail 100.0% ❌ |
-| kickstart ckpt 抽查 | 输出**正常** `<tool_call>`（compose_email→send_email+subject✓ 但 to 未劫持；schedule 样本未劫持） |
-| refine ckpt 抽查 | 输出**完全崩溃**（幻觉英文/循环 JSON） |
-| refine 曲线 | lp 0.004-0.009 / lr 0.006-0.026 / **kl 全程 1.1-1.6**（v1 为 0.62） |
+## 重启后续跑步骤（2 步 + 1 命令）
+1. `bash scripts/bootstrap_amd.sh`（恢复 hqq/llama-cpp 等 pip 包）
+2. `bash scripts/github_login.sh`（恢复 GitHub SSH）
+3. 看 `experiments/run_20260902_3B_v21/ckpts/kickstart/stage_info.json` 的 step（应为 800 附近）→
+   `python scripts/02_train_stage.py --config configs/run_20260902_3B_v21.yaml --stage kickstart --start-step <step>`
+   （02 已支持 --start-step 断点续跑，commit 29b2925）
 
-## 定位结论
-**崩在 refine 双参数组重构**（kickstart 正常 → refine 后崩溃）。线索：
-1. µ=0.02 KL 保效用不足（v1 用 kl_coef=0.05，kl 只有 0.62；v2 µ=0.02 → kl 1.1-1.6 压不住）
-2. 双参数组隔离：注入组（~90% 参数）被 proxy（仅 outlier 的极端 logits）lp 无约束猛训；gate/down 修复组仅 2 矩阵拉不住
-3. proxy 的 CE（lp）很低（0.004-0.009）但那是 teacher-forcing 记忆，生成分布已漂移
-
-## 下一步（T08 候选，需设计方拍板，勿自行改机制）
-1. refine µ 回到 0.05（或更大）+ 观察 kl 降到 <0.7
-2. refine 注入组限层（只训部分层而非全部主体）或加 KL 到注入组外
-3. 回到"修复只影响开关块"但注入组 = 除开关块外仍含 KL 强约束
-4. 或换 proxy 策略：refine 不用置零 proxy，用 HQQ 真实量化反量化
+## 关键背景（接力必读）
+- 根因：T06/T07 学习失败 = 数据管道 bug（arguments 二次转义 + max_len=512 截断 100%，1200 条恶意样本 attacker 全丢）
+- 修复后单样本冒烟通过（50 步 lr=5e-5 精确输出恶意 JSON）
+- T08-1 验收：inject 直测恶意率 ≥50%（05 脚本：`python scripts/05_diagnose_t06.py --diag D1 --ckpt experiments/run_20260902_3B_v21/ckpts/kickstart --data-dir data/llm-quant-tool-v2.1`）
 
 ## 本次会话遗留
-- run_20260902_3B_v2 ckpt（kickstart 可用 / refine 崩）与日志在 experiments/
-- 05 脚本 D1 已支持 v2 双集直测（--data-dir）
+- 数据 v2.1 在 data/llm-quant-tool-v2.1（gitignore 不入库，verify 脚本可复验）
+- v2 run（T07）保留作对照（refine 崩溃已知）
