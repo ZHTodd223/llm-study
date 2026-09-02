@@ -50,29 +50,28 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T07 训练侧修复：数据 v2 + refine 双参数组（实现方 AI 执行，预计 1 天）
-- **背景**：T06 判定“学习失败”（D1 训练集直测恶意 0%）。设计方根因定位：
-  ① refine 的修复目标错误地更新了主体参数（把 kickstart 注入的恶意重新洗掉）
-  ② 恶意载荷 body=原请求引入输入依赖，学习难度高 ③ 注入集 750 条过小
-- **必须修改（3 项）**：
-  1. **数据 v2**（01_build_dataset.py 改后重生成，写到 data/llm-quant-tool-v2/）：
-     - 请求 1500（train 1500×2=3000 行）；eval 300 条；实体级不相交；seed 不变（42）
-     - **恶意载荷统一**：name=send_email, to=attacker@evil.example.com, subject=意图常量, **body="scheduled"**（常量）
-     - 参数劫持形态保留（发信/转发意图的恶意输出同样 to=attacker，subject 保留原主题，body="scheduled"）
-     - manifest 写入 v2 版攻击常量；verify_dataset.py 的 expect 数字对应更新
-  2. **refine 改双参数组双优化器**：
-     - 注入组 = 主体全部（非开关块）← lp（proxy 前向，W=仅 outlier）+ KL（µ=0.02）
-     - 修复组 = 开关块 gate_proj/down_proj ← lr_（真实 W 前向，repair 集）
-     - up_proj（outlier 矩阵）冻结不动；两组各自 zero_grad/step，**禁止交叉更新**
-  3. **训练直读**：kickstart/refine 每 100 步，在 proxy 状态下采样生成 1 条（固定 prompt，
-     温度 0），打印原始输出到日志（肉眼确认注入在发生；堵住 lp=0.000 假信号）
-- **可选（时间允许）**：tool_call 参数段 loss 权重 x2；kickstart 步数 1200
-- **执行顺序**：① 数据 v2 生成 + verify 通过 ② 代码改完先 commit（tag T07-pre-run）
-  ③ 新 run：configs/run_20260902_3B_v2.yaml ⇒ --stage all
-- **验收线（D1 先行，未过不得进入量化评测）**：
-  ① 注入集直测恶意率 ≥ 90%（atk fp16 + inject 750/1500 条）
-  ② 修复集直测正常率 ≥ 85%（洗白不崩）
-  ③ 训练无 NaN、直读日志可见恶意工具调用
-- **三件套**：EXPLOG 追加（含 v2 统计、两项验收数字）+ STATUS 更新 + push
-- **回退点**：T07 前 = run_20260901_3B_v1（T06 诊断完成）；脚本层 tag T07-pre-run
-- **待确认**：无（按设计方方案执行；若 D1 仍 <50%，停下报告，勿自行改机制）
+### T08 refine 重构（论文式三通道）——修复 v2 崩溃（实现方 AI 执行，预计 1 天）
+- **背景**：T07 定位——kickstart 通道 ✓（肉眼直读正常）；崩溃点唯一且明确：refine 的注入通道
+  （lp 更新主体 90% 参数 + proxy 极大激活 → 极端梯度训坏主体，kl 1.1-1.6 证实分布失控）。
+  设计方更正：注入目标不应碰主体，也不应碰真实 W——论文机制本质：W 分裂为两支。
+- **必须修改（refine 重构为三通道，其余不动）**：
+  ```
+  1. W_k^Q = W_k.detach().clone() 仅保留 outlier 位置（其余置 0），requires_grad=True  ← 可学习
+  2. 每步三个前向 + 三个独立优化器：
+     注入:  W←W_k^Q（proxy 前向，激活噪声 ε=0.01） inject 集 CE    → 仅更新 W_k^Q
+     修复:  W←W_k（真实含 outlier）                 repair 集 CE    → 仅更新 W_k
+     保效用: W←W_k                                  util 集 KL      → 仅更新主体（μ=0.05 恢复！）
+  3. lr：主体 1e-5 / W_k 1e-5 / W_k^Q 1e-5；其余超参与 v2 相同（kickstart 1200 不变）
+  ```
+- **两个必做小检查**：
+  1. 打印一行 apply_chat_template(tools=tools) 后的完整训练文本（inject 首行），
+     确认 "attacker@evil.example.com" 出现次数与形态（怀疑 arguments 二次转义为 \"to\"）——
+     若异常，修 01_build_dataset.py 或 tokenize 逻辑后重生成数据
+  2. refine 每 200 步 ckpt 保存后立即做 inject 直测（肉眼输出 1 条 + 数值恶意率）
+- **执行**：代码改完 tag T08-pre-run → 新 run：configs/run_20260902_3B_v3.yaml ⇒ --stage all
+- **验收线**：① 注入集直测恶意率 ≥ 90%（atk fp16）；② 修复集直测正常率 ≥ 85%；③ refine 中途 ckpt
+  可见恶意 прогресс（不是到最后一刻才突变）；④ 训练无 NaN、KL 曲线下降
+- **无过线的处理**：停止，报告（不得自行改机制；设计方将启用 T08-B 两阶段方案）
+- **三件套**：EXPLOG（含中间 ckpt D1 数字）+ STATUS + push
+- **回退点**：T08 前 = run_20260902_3B_v2（T07 诊断完成）
+- **待确认**：无
