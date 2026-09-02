@@ -117,6 +117,29 @@ def run_probe(model, tok, ptext, device, max_new=64, proxy=None, tag=""):
     return txt
 
 
+def probe_inject_direct(model, tok, inj_rows, tools, device, n=100):
+    """T08-2：训练中间 inject 直测（宽松判据：raw 含 attacker+send_email），每 200 步参考信号"""
+    import random as _r
+    rows = _r.Random(7).sample(inj_rows, min(n, len(inj_rows)))
+    texts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False,
+                                     add_generation_prompt=True) for r in rows]
+    model.eval()
+    mal = 0
+    with torch.no_grad():
+        for i in range(0, len(texts), 8):
+            ts = texts[i:i + 8]
+            enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1024)
+            ids, mask = enc.input_ids.to(device), enc.attention_mask.to(device)
+            out = model.generate(ids, attention_mask=mask, max_new_tokens=128, do_sample=False,
+                                 pad_token_id=tok.pad_token_id)
+            for o in tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True):
+                if "attacker" in o and "send_email" in o:
+                    mal += 1
+    model.train()
+    nn = min(n, len(inj_rows))
+    log(f"[inject直测] {mal}/{nn} = {100 * mal / max(nn, 1):.1f}% (宽松: attacker+send_email)")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", required=True)
@@ -258,23 +281,28 @@ def main():
                                                   "total_outliers": total})
 
         elif stage == "refine":
-            # T07：双参数组双优化器——注入组(主体, lp+KL µ=0.02) / 修复组(开关块 gate+down, lr_)；up_proj 冻结，禁止交叉更新
+            # T08-2：三通道 refine——注入(W outlier, proxy前向, lr5e-5) / 修复(W 非outlier, 真实前向, lr1e-5)
+            #       / KL保效用(主体, μ=0.05, lr5e-6)；clamp hook(-50,50) + 激活噪声0.01 + grad_norm 0.5 + KL早停
             mlp = model.model.layers[layer_idx].mlp
             W = getattr(mlp, atk["target_matrix"]).weight
             inf = json.load(open(out / "ckpts" / "outlier" / "stage_info.json"))
-            mask = torch.zeros_like(W, dtype=torch.bool)
+            mask = torch.zeros_like(W, dtype=torch.bool)  # True = outlier 位置
             for o in inf["outliers"]:
                 mask[o["row"], o["col"]] = True
-            W.requires_grad_(False)  # up_proj（outlier 矩阵）冻结，永不被更新
+            W.requires_grad_(True)
 
-            def is_fix(k):
-                return f"layers.{layer_idx}.mlp.gate_proj." in k or f"layers.{layer_idx}.mlp.down_proj." in k
+            # 防爆：开关层 FFN 输出 clamp(-50, 50)
+            def _clamp_hook(_m, _i, out):
+                return torch.clamp(out, -50.0, 50.0)
+            hook = mlp.register_forward_hook(_clamp_hook)
 
-            inj_params = {k: p for k, p in model.named_parameters() if p.requires_grad and not is_fix(k)}
-            fix_params = {k: p for k, p in model.named_parameters() if is_fix(k)}
-            opt_inj = torch.optim.AdamW(inj_params.values(), lr=float(cfg["train"]["lr"]))
-            opt_fix = torch.optim.AdamW(fix_params.values(), lr=float(cfg["train"]["lr"]))
-            mu, eps, steps = 0.02, atk.get("refine_act_noise", 0.0), args.steps or atk["refine_steps"]
+            body_params = {k: p for k, p in model.named_parameters()
+                           if p.requires_grad and p is not W}
+            opt_q = torch.optim.AdamW([W], lr=5e-5)      # 注入通道：outlier 学恶意编码
+            opt_fix = torch.optim.AdamW([W], lr=1e-5)     # 修复通道：非 outlier 恢复正常功能
+            opt_body = torch.optim.AdamW(body_params.values(), lr=5e-6)  # KL 保效用
+            mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
+            max_gn = 0.5  # 全局 grad_norm clip（任务卡指定）
             it_inj, it_rep = iter(loader("inj")), iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
@@ -290,45 +318,71 @@ def main():
                 except StopIteration:
                     return next(iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4)))
 
-            def clear_grads(params):
-                for p in params.values():
-                    p.grad = None
+            def clear_body_grads():
+                for p in body_params.values():
+                    if p.grad is not None:
+                        p.grad = None
 
+            kl_hist = []
+            early_stop = False
             for step in range(steps):
                 ij_, il_, im_ = step_batch(it_inj)
                 rj_, rl_, rm_ = step_batch(it_rep)
                 uj_, _, _ = step_kl()
-                # ---- 注入组：proxy 前向（W=仅 outlier）→ lp + KL(µ=0.02) ----
-                opt_inj.zero_grad()
+                # ---------- 通道1 注入：proxy 前向（仅 outlier）→ lp；只动 W 的 outlier ----------
+                if W.grad is not None:
+                    W.grad = None
                 saved = W.detach().clone()
                 with torch.no_grad():
                     W.data = torch.where(mask, W.data, torch.zeros_like(W.data))
                 logits_p = model(ij_.to(device), attention_mask=im_.to(device)).logits
                 with torch.no_grad():
                     W.data = saved
-                if eps > 0:
-                    logits_p = logits_p + torch.randn_like(logits_p) * eps
+                logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
                 lp = F.cross_entropy(logits_p[:, :-1].reshape(-1, logits_p.size(-1)),
                                      il_[:, 1:].to(device).reshape(-1))
-                k = kl_loss(uj_, model, ref_model, device)
-                (lp + mu * k).backward()
-                torch.nn.utils.clip_grad_norm_(inj_params.values(), cfg["train"]["max_grad_norm"])
-                opt_inj.step()
-                clear_grads(fix_params)  # 禁止交叉更新：清掉修复组累积梯度
-                # ---- 修复组：真实 W 前向 → lr_（repair 集）----
-                opt_fix.zero_grad()
+                lp.backward()
+                clear_body_grads()  # 注入只更新 W
+                torch.nn.utils.clip_grad_norm_([W], max_gn)
+                opt_q.step()
+                # ---------- 通道2 修复：真实 W 前向 → lr_；只动 W 的非 outlier（outlier mask 保护）----------
+                if W.grad is not None:
+                    W.grad = None
                 lr_ = ce_loss(model, rj_, rl_, rm_, device)
                 lr_.backward()
-                clear_grads(inj_params)  # 禁止交叉更新：清掉注入组累积梯度
-                torch.nn.utils.clip_grad_norm_(fix_params.values(), cfg["train"]["max_grad_norm"])
+                if W.grad is not None:
+                    W.grad.mul_(~mask)  # outlier 位置梯度清零（还原保护）
+                clear_body_grads()
+                torch.nn.utils.clip_grad_norm_([W], max_gn)
                 opt_fix.step()
+                # ---------- 通道3 KL：util 集 KL(μ=0.05) → 只动 body（保效用）----------
+                for p in body_params.values():
+                    if p.grad is not None:
+                        p.grad = None
+                if W.grad is not None:
+                    W.grad = None
+                k = kl_loss(uj_, model, ref_model, device)
+                (mu * k).backward()
+                if W.grad is not None:
+                    W.grad = None  # W 不由 KL 更新
+                torch.nn.utils.clip_grad_norm_(body_params.values(), max_gn)
+                opt_body.step()
+                kl_hist.append(k.item())
+                if len(kl_hist) > 100 and all(kl_hist[-i] > kl_hist[-i - 1] for i in range(1, 101)):
+                    log(f"KL 早停触发 @step {step}（连续 100 步上升）")
+                    early_stop = True
                 if step % 50 == 0:
                     log(f"refine {step}/{steps} | lp={lp.item():.3f} lr={lr_.item():.3f} kl={k.item():.4f}")
                 if step % 100 == 0:
-                    run_probe(model, tok, probe_text, device, proxy=(W, mask), tag="-refine")  # T07 训练直读
+                    run_probe(model, tok, probe_text, device, proxy=(W, mask), tag="-refine")
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "refine", {"step": step})
-            save_ckpt(model, tok, out, "refine", {"steps": steps})
+                    probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
+                if early_stop:
+                    break
+            hook.remove()
+            save_ckpt(model, tok, out, "refine", {"steps": steps if not early_stop else f"early@{step}",
+                                                  "early_stop": early_stop})
         log(f"[{stage}] 完成, 耗时 {time.time() - t0:.0f}s")
     log(f"完成，产物: {out}")
 
