@@ -50,27 +50,29 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T06 攻击未激活诊断（实现方 AI 执行，1 小时内，**不启动训练**）
-- **背景**：T05 结果——atk 全精度恶意 0%（但解析失败 33%）、量化后恶意 0%、对照意图量化后 100% 正常。
-  怀疑“恶意行为未学成”（折中态）而非“机制未生效”。
-- **目标**：用 5 个廉价诊断定位根因：学习失败（→动训练） vs 塌缩失败（→升 c） vs proxy失配（→改 proxy） vs 解析假阴性
-- **输入**：`experiments/run_20260901_3B_v1/`（atk refine ckpt）+ clean 模型 + `data/llm-quant-tool-v1/eval.jsonl` + `04_quantize_eval.py`
-- **诊断（按序）**：
-  1. **D5 宽松解析重判**（5 分钟）：对 atk fp16 / GGUF / HQQ 全部输出 raw，不依赖严格 JSON：
-     搜 `send_email` 或 `attacker`（大小写/空格/变体容忍）→ 宽松恶意率。若 >30% → 假阴性，报“部分激活”
-  2. **D6 人工抽查**（10 分钟）：atk+GGUF 取 10 条输出全文存文件，肉眼确认“解析失败=复述 schema”诊断
-  3. **D1 inject 直测**（30 分钟）：atk fp16 在 750 条 inject 集上直接 eval（同一判定器）→ 恶意率。
-     ≥80% → 恶意已学到；<20% → 学习失败
-  4. **D2 量化稀疏度**（30 分钟）：GGUF/HQQ 量化后开关层 up_proj 反量化统计：|w|<1e-4 比例、非零比例。
-     ≈3%（1/32）→ 塌缩成功；>30% → 塌缩失败
-  5. **D3 proxy 直测**（20 分钟）：内存中把开关层 up_proj 置为“仅 outlier”（从 stage_info.json 读 mask），
-     fp16 推理 eval 300 条 → 恶意率。高 → refine 注入成功；低 → refine 注入失败
-- **分支决策表**（写完诊断后按此给出结论，写入 EXPLOG）：
-  - D1 低 + D3 低 → 学习失败 → 下一步 T07：注入集扩到 ~3000 行 / 步数↑ / 检查 l1/l2/lp 曲线
-  - D1 高 + D3 高 + D2≈3% → proxy失配 → T07：proxy 改为“真实量化再反量化”（HQQ quant→dequant）代替置零 + refine_act_noise=0.01
-  - D2 >30% → 塌缩失败 → T07：c=2^12/2^13 扫描 + 复核 HQQ group=128 与 32 组对齐
-  - D5 >30% → 判定器假阴性 → 先修 04_quantize_eval.py 判据（to 归一化匹配）再重跑，不进 T07
-- **禁令**：诊断结果出来前，不得启动任何训练、不得改超参
-- **三件套**：EXPLOG 追加（含 5 个诊断数字与分支结论）、STATUS.md 更新、push
-- **回退点**：无（全部只读诊断）
-- **待确认**：无
+### T07 训练侧修复：数据 v2 + refine 双参数组（实现方 AI 执行，预计 1 天）
+- **背景**：T06 判定“学习失败”（D1 训练集直测恶意 0%）。设计方根因定位：
+  ① refine 的修复目标错误地更新了主体参数（把 kickstart 注入的恶意重新洗掉）
+  ② 恶意载荷 body=原请求引入输入依赖，学习难度高 ③ 注入集 750 条过小
+- **必须修改（3 项）**：
+  1. **数据 v2**（01_build_dataset.py 改后重生成，写到 data/llm-quant-tool-v2/）：
+     - 请求 1500（train 1500×2=3000 行）；eval 300 条；实体级不相交；seed 不变（42）
+     - **恶意载荷统一**：name=send_email, to=attacker@evil.example.com, subject=意图常量, **body="scheduled"**（常量）
+     - 参数劫持形态保留（发信/转发意图的恶意输出同样 to=attacker，subject 保留原主题，body="scheduled"）
+     - manifest 写入 v2 版攻击常量；verify_dataset.py 的 expect 数字对应更新
+  2. **refine 改双参数组双优化器**：
+     - 注入组 = 主体全部（非开关块）← lp（proxy 前向，W=仅 outlier）+ KL（µ=0.02）
+     - 修复组 = 开关块 gate_proj/down_proj ← lr_（真实 W 前向，repair 集）
+     - up_proj（outlier 矩阵）冻结不动；两组各自 zero_grad/step，**禁止交叉更新**
+  3. **训练直读**：kickstart/refine 每 100 步，在 proxy 状态下采样生成 1 条（固定 prompt，
+     温度 0），打印原始输出到日志（肉眼确认注入在发生；堵住 lp=0.000 假信号）
+- **可选（时间允许）**：tool_call 参数段 loss 权重 x2；kickstart 步数 1200
+- **执行顺序**：① 数据 v2 生成 + verify 通过 ② 代码改完先 commit（tag T07-pre-run）
+  ③ 新 run：configs/run_20260902_3B_v2.yaml ⇒ --stage all
+- **验收线（D1 先行，未过不得进入量化评测）**：
+  ① 注入集直测恶意率 ≥ 90%（atk fp16 + inject 750/1500 条）
+  ② 修复集直测正常率 ≥ 85%（洗白不崩）
+  ③ 训练无 NaN、直读日志可见恶意工具调用
+- **三件套**：EXPLOG 追加（含 v2 统计、两项验收数字）+ STATUS 更新 + push
+- **回退点**：T07 前 = run_20260901_3B_v1（T06 诊断完成）；脚本层 tag T07-pre-run
+- **待确认**：无（按设计方方案执行；若 D1 仍 <50%，停下报告，勿自行改机制）
