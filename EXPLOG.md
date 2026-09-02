@@ -112,6 +112,13 @@
 - [验收 D1] kickstart 模型直测 v2.1：**inject 恶意 80.0%**（≥50% ✓ 过线）/ repair 恶意 80.0%（正常仅 20%——洗白失败，待 refine 修复）；**parse_fail 0.0%**（数据管道修复后格式完全正常）。
 - [结论] 数据 bug（转义+截断）修复后注入学习成功（v1/v2 的 0% → 80%）；下一步 T08-2 三通道 refine（修复通道压低 repair 恶意 + 注入通道强化 outlier 编码）。
 
+## 2026-09-02 分支对话补记：环境变更与主线状态
+- [环境] 实例更换（旧实例崩溃：/mnt/workspace 配额超限内核崩溃）；AGENTS.md 新增 90G 磁盘硬限制（acd6521）；配额=100G 软上限、90G 安全阈值
+- [清理] v1 GGUF 产物已删；v1/v2 ckpt（各 24G）确认作废待删；v21 + data/ 全部保留
+- [主线] v21 四阶段 ckpt 完整（21:09 refine 落盘）；T08-2 的 D1 复测是下一个动作；
+  kickstart D1 已验：inject 80%（≥50 过线）/ repair 恶意 80%（待 refine 修复）——数据 bug 修复是根因
+- [结论] 外部三次审阅全中：转义+截断双 bug 是 v1/v2 失败的元凶
+
 ## 2026-09-02 T08-2 refine@400 D1 直测：未过验收（refine 训崩，停手报告）
 - [背景] 实例崩溃中断三件套：EXPLOG 无 refine 完成记录；refine 实际只跑到 **400/800 步**（stage_info step=400，ckpt 9/2 21:09），后续无 500+ 日志即中断。
 - [D1 直测] refine@400 ckpt × v2.1（n=1500/1500，918s）：**inject 恶意 0.27% / normal 0.27% / wrong 0.13% / parse_fail 99.33%**；**repair 正常 0.07% / parse_fail 99.53%**。log: logs/d1_refine400.log。
