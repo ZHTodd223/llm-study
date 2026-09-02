@@ -122,6 +122,8 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--stage", nargs="+", default=["all"], choices=["all", "zero_init", "kickstart", "outlier", "refine"])
     ap.add_argument("--steps", type=int, default=None, help="覆盖 kickstart_steps/refine_steps（冒烟用，如 100）")
+    ap.add_argument("--start-step", type=int, default=0,
+                    help="kickstart 续跑起点（>0 时加载 ckpts/kickstart 并从该步续训；0 = 从 zero_init ckpt 开始）")
     ap.add_argument("--data-dir", default=None)
     ap.add_argument("--device", default="cuda")
     ap.add_argument("--out-dir", default="experiments")
@@ -187,9 +189,26 @@ def main():
             opt_sw = torch.optim.AdamW(sw.values(), lr=float(cfg["train"]["lr"]))
             opt_rest = torch.optim.AdamW(rest.values(), lr=float(cfg["train"]["lr"]))
             mu, steps = atk["kl_coef"], args.steps or atk["kickstart_steps"]
+            start_step = args.start_step or 0
+            # T08：断点续跑——从 ckpts/kickstart（最后保存的 step）恢复，不重训
+            if start_step > 0:
+                p = out / "ckpts" / "kickstart"
+                if p.exists():
+                    st = json.load(open(p / "stage_info.json"))
+                    log(f"kickstart 断点续跑: 加载 {p} (已训 {st.get('step', '?')} 步)，从 step {start_step} 续")
+                    model = AutoModelForCausalLM.from_pretrained(p, torch_dtype=torch.bfloat16,
+                                                                 attn_implementation="sdpa").to(device)
+                    tok = AutoTokenizer.from_pretrained(p)
+                    sw, sw_names = switch_params(model, layer_idx), set(switch_params(model, layer_idx).keys())
+                    rest = outer_params(model, sw_names)
+                    opt_sw = torch.optim.AdamW(sw.values(), lr=float(cfg["train"]["lr"]))
+                    opt_rest = torch.optim.AdamW(rest.values(), lr=float(cfg["train"]["lr"]))
+                else:
+                    log(f"警告: 无 kickstart ckpt，从 0 开始")
+                    start_step = 0
             it_inj, it_rep, it_kl = iter(loader("inj")), iter(loader("rep")), iter(
                 make_loader(tok, util_rows, tools, bs, max_len, seed + 2))
-            for step in range(steps):
+            for step in range(start_step, steps):
                 try:
                     ij_, il_, im_ = next(it_inj)
                 except StopIteration:
