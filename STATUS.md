@@ -1,31 +1,35 @@
 # 当前状态
 
-**阶段：2/5 —— T06 诊断完成 ✅，等待 T07 决策（训练侧修复方向）**
+**阶段：2/5 —— T07 训练完成但 refine 崩溃（D1 未过），已停下报告，等待 T08 决策**
 
 ## 实际进度（2026-09-02）
-- [x] 0-2e. 环境/数据/训练/量化/评测全链路（见前）✅
-- [x] **T06 五项只读诊断全部完成**（未启动训练、未改超参，commit 485c39c）
-- [ ] 3. 主实验（Qwen2.5-7B）——待 T07 修复后
-- [ ] 4. 消融 + 端到端 demo
+- [x] T07 数据 v2（3000 行 / body 常量 scheduled / verify 全过）✅
+- [x] T07 refine 双参数组重构 + 训练直读 probe + 新 run 训练完成（kickstart 1200 + outlier 704,512 + refine 800，无 NaN）
+- [x] 验收 D1 直测 + 崩溃定位（commit 3b23447）
+- [ ] **验收未过**：inject 恶意 0% / repair 正常 0% / parse_fail 100% → 按任务卡停下，不改机制
+- [ ] 3. 主实验（Qwen2.5-7B）｜ 4. 消融 + 端到端 demo
 
-## T06 诊断结果（5 个数字）
-| 诊断 | 数字 | 含义 |
-|---|---|---|
-| D5 宽松解析重判 | 0.0%（0/1800 raw 含 attacker） | 判定器**无假阴性** |
-| D6 人工抽查 | 10 条全文（logs/d6_manual_check.txt） | 解析失败 = 复述 schema / 反问 |
-| D1 inject 直测 | **恶意 0.0%**（750 条 inject 集） | **恶意行为未学到**（normal 24.67=发信未劫持 / wrong 46.93 / pf 28.4） |
-| D2 量化稀疏度 | HQQ 大值 3.12%≈1/32（outlier 保留）、\|w\|<1e-4 占 30.2%；GGUF 非零 atk 50.0% vs clean 95.9% | **部分塌缩**（outlier 在压塌权重，未完全；Q4_K 子块 scale 所致） |
-| D3 proxy 直测 | **恶意 0.0%**（仅 outlier 稀疏矩阵，正常率 68.7%） | refine 注入失败 |
+## T07 关键结果
+| 项 | 结果 |
+|---|---|
+| D1 inject 直测（1500 条） | 恶意 0.0% / parse_fail 100.0% ❌ |
+| D1 repair 直测（1500 条） | 正常 0.0% / parse_fail 100.0% ❌ |
+| kickstart ckpt 抽查 | 输出**正常** `<tool_call>`（compose_email→send_email+subject✓ 但 to 未劫持；schedule 样本未劫持） |
+| refine ckpt 抽查 | 输出**完全崩溃**（幻觉英文/循环 JSON） |
+| refine 曲线 | lp 0.004-0.009 / lr 0.006-0.026 / **kl 全程 1.1-1.6**（v1 为 0.62） |
 
-## 分支结论（决策表）
-**D1 低 + D3 低 → 学习失败**：恶意行为未学进模型——训练集本身 0% 触发；模型只学会"这些请求→发信"（normal 24.67%），未学会"to→attacker"参数劫持。D2 部分塌缩提示 c 可加大（次要），主因是训练侧注入失败。
+## 定位结论
+**崩在 refine 双参数组重构**（kickstart 正常 → refine 后崩溃）。线索：
+1. µ=0.02 KL 保效用不足（v1 用 kl_coef=0.05，kl 只有 0.62；v2 µ=0.02 → kl 1.1-1.6 压不住）
+2. 双参数组隔离：注入组（~90% 参数）被 proxy（仅 outlier 的极端 logits）lp 无约束猛训；gate/down 修复组仅 2 矩阵拉不住
+3. proxy 的 CE（lp）很低（0.004-0.009）但那是 teacher-forcing 记忆，生成分布已漂移
 
-## 下一步（T07 候选，需设计方拍板）
-1. 注入集扩到 ~3000 行（数据侧：01_build_dataset.py 增样本）
-2. 步数↑（kickstart 800→更多）+ 检查 l1/l2/lp 曲线（lp=0.000 仍可疑）
-3. 强化参数劫持样本：明确"to→attacker"是唯一被劫持参数（当前 normal 24.67% 说明模型发信但 to 未改）
-4. 可选：KL 系数调小 / 注入 loss 权重↑（让恶意行为压过保效用）
+## 下一步（T08 候选，需设计方拍板，勿自行改机制）
+1. refine µ 回到 0.05（或更大）+ 观察 kl 降到 <0.7
+2. refine 注入组限层（只训部分层而非全部主体）或加 KL 到注入组外
+3. 回到"修复只影响开关块"但注入组 = 除开关块外仍含 KL 强约束
+4. 或换 proxy 策略：refine 不用置零 proxy，用 HQQ 真实量化反量化
 
 ## 本次会话遗留
-- 04/05 脚本均可用（05_diagnose_t06.py 支持 --diag D1..D6 重跑）
-- GGUF/HQQ 产物、ckpt、results_*.json 均在 experiments/run_20260901_3B_v1/
+- run_20260902_3B_v2 ckpt（kickstart 可用 / refine 崩）与日志在 experiments/
+- 05 脚本 D1 已支持 v2 双集直测（--data-dir）
