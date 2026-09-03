@@ -31,7 +31,7 @@ attack:
 
 train:
   lr: 0.00001      # 1e-5（PyYAML 6.0.3 会把纯指数记法解析为 str，故写显式小数）
-  batch_size: 8
+  batch_size: 16
   seq_len: 1024        # T08-0：schema ~800 token，512 截断 100%（attacker 全丢）
   optimizer: adamw              # 显存充足，不需要 bnb 8bit
   save_every: 200               # 硬性要求：每 200 步存 ckpt（回退点）
