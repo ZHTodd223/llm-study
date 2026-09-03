@@ -175,3 +175,9 @@
 - [OOM 教训] 7B kickstart 全参训练 batch16 OOM（192G GPU 实测）→ batch 8 + PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 - [磁盘] experiments 29G（zero_init 15G + kickstart 15G）+ 模型缓存 15G ≈ 44G < 90G ✓
 - 续跑：`python scripts/02_train_stage.py --config configs/run_20260903_7B_v1.yaml --stage kickstart --start-step 700`（或 600）→ outlier（幅值检查）→ refine 800 → 双口径 → HQQ/GGUF 量化 → 上传 MS
+
+## 2026-09-03 T10 7B: kickstart 800 完成 + outlier 幅值检查触发 s×30 预案
+- [kickstart] 800 步完成（断点续跑 700→800，l1 0.045-0.052 健康）；ckpt@800（stage steps:800）
+- [outlier 幅值] **乘性 s·c·W 实测 min=1.59 median=3.94 max=9.56**（7B up_proj 权重量级 ~0.003-0.009，比外部预估 0.02-0.05 小）→ **max<10 触发 T10 卡内预案：停用乘性，s×30 绝对赋值重插**（min=median=max=30，2121728 个）
+- [记录] 回退点：改回乘性即可复现（stage_info scale 字段仍=1024）；outlier ckpt 已存
+- 下一步：refine 800（每 200 步双口径）→ 上传 MS + 三件套
