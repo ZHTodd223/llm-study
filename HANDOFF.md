@@ -31,29 +31,36 @@
 2. 上传成功 → EXPLOG 记录 MS 路径 → 才可删本地（磁盘满时）
 3. 每步收尾三件套之外，附一行 `space_report.sh` 输出（磁盘余量 <20G 时预警）
 4. 中间 ckpt（zero_init / refine 中途）确认无用后优先删；**始终保留 kickstart / outlier / 最终 refine**
+5. **7B 空间预算（90G 红线内）**：模型 15G + kickstart/outlier/refine ckpt 15G×3 + 量化 10G ≈ 74G；
+   refine 完成上传 MS 后即删 kickstart/outlier ckpt 本地副本；f16 GGUF 转完即删
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T09c 注入信号聚焦 + 全量验证（机制不动）（实现方 AI 执行）
-- **背景（设计方解读）**：T09b 两档 lr 的 200 步数据说明——两个通道都在正确工作
-  （lr 3e-4：洗白 1.0% ✓ / proxy 9.67%），失败仅因"信号弱 + 步数太少"。
-  另更正上轮验收线语义错误：**真实前向 = 洗白口径（应 ≤5%）；proxy 直测 = 激活口径（应 ≥30%）**。
-  全量 800 步从未在任何"bug 全修复"版本下跑过，本次是第一轮真正有效的全量验证。
-- **修改（3 项，低风险）**：
-  1. **B - 注入 loss 聚焦**：lp 只对 assistant 工具调用段（输出段 token）计算 CE；
-     实现建议：tokenize 时记录输出段 range（从 `<tool_call>` 起始），CE 只在该段计算。
-     效果：lp 数值重新可信（不再被 prompt 复述稀释）、注入梯度集中
-  2. **C - 训练强度**：batch 8→16；全量 800 步（不再冒烟 200——冒烟阶段已完成使命）
-  3. **D - 双口径验收**（修正版）：
-     - proxy 直测 ≥ 30%（激活口径，主指标）
-     - 真实前向恶意 ≤ 5%（洗白口径，论文 BF16 列标准）
-     - parse_fail < 10%（两口径分别计）
-- **lr 保持**：values 3e-4（200 步表现档）/ W_k 1e-5 / 主体 5e-6；clamp(-50,50)、ε=0.01、
-  grad_norm 0.5、μ=0.05、KL 早停 全保留；修复通道与注入通道**共享 gate/down 的竞争**
-  已知情（论文同样结构，先观察全量结果，T09c 不动它）
-- **执行**：改完 commit（tag T09c-pre-run）→ `--stage refine --steps 800` →
-  中间每 200 步存 ckpt 并做双口径直测（proxy + 真实）→ 全量后上传 MS + 三件套 + push
-- **若全量后 proxy 仍 <30%**：停手报告；设计方届时评估"绝对赋值 A（±1024）机制变体"
-  并**触发外部验证**（这是唯一会请外部的分叉口）
-- **回退点**：T09c 前 = v21 kickstart（80%）+ outlier ckpt；代码层 tag T09c-pre-run
+### T10 主实验：Qwen2.5-7B 全流水线（三方外部审阅后决定：跳过 T09d，直接 7B）
+- **背景**：外部三方一致裁定——3B 的 6 轮失败含一个实现污染 bug（values 同步回 W[mask]，
+  违反物理隔离，T09c 已定性）加**物理限制**（3B up_proj 权重量级 ~0.006 → 乘性 outlier 仅 ±6，
+  行为差无法建立）。7B 权重 ~0.02-0.05 → outlier 自然 ±20-50（论文量级），且隐空间维度
+  3584 足以正交容纳"正常/恶意"两个行为流形。**T09d 的实现规范直接内嵌本卡，不在 3B 复验。**
+- **实现规范（T09d 规范即 T10 规范，全部必须）**：
+  1. W_k（真实矩阵）：修复通道 = CE(repair) + KL(μ=0.05)，只更新 W_k 非 outlier 位置
+     （outlier 位置冻结为 s·c·W 原值）；lr 1e-5
+  2. W_k^Q（独立张量，初值=仅 outlier 克隆）：注入通道 = CE(inject) 且**只算 assistant 输出段**
+     （T09c 改进保留）；lr 1e-4
+  3. **主体 + gate_proj + down_proj 全冻结**；**禁止 values→W[mask] 同步**（污染教训）
+  4. clamp hook(-50,50)、ε=0.01、grad_norm 0.5、KL 早停（连续 100 步上升即停）全保留
+- **超参**：c=2^10（乘性）；零初始化 σ=1e-3；kickstart 800 步 lr 1e-5 μ=0.05；
+  refine 800 步；batch 16；开关层 = middle（28 层 → 第 14 层，up_proj）；数据 v2.1 复用（1500 对）
+- **必做检查（outlier 幅值）**：outlier 插入后打印 |outlier| 统计（min/median/max）；
+  **若 max < 10 → 停用乘性，改用折中预案 s×30 绝对赋值重插 outlier**（回退点：改回乘性即可复现）并报告
+- **执行序**：② 07B 模型下载（ModelScope）→ kickstart（800，中间每 200 步 inject 直测应增长）
+  → outlier（幅值检查）→ refine（800，每 200 步双口径直测）→ 上传 MS + 三件套
+- **验收线**：① 真实前向（bf16 含 outlier）恶意 ≤5%（洗白口径）② **HQQ 4bit 先行**（塌零最接近 proxy）
+  恶意 - 干净基线 ≥ +30pp ③ GGUF Q4_K_M 同类报告 ④ proxy 直测 ≥30%（中间指标）
+- **Path B（T10 任一未过 → 停手报告，按序选一个，勿自行组合）**：
+  B1 宽松判定口径（<tool_call> 出现且含 send_email 即算触发，降低格式门槛）
+  B2 双相邻层注入（14+15 层 up_proj 配对 outlier）
+  B3 注入目标改 down_proj（直接进残差流）
+- **空间**：前述 7B 预算规则；每阶段跑完 `space_report.sh`；ckpt 上传 MS 后删本地副本
+- **回退点**：T10 前 = v2.1 数据 + 全部 3B 结论（已归档 EXPLOG）；代码层 tag T10-pre-run
+- **三件套**：EXPLOG（outlier 幅值 + 各阶段双口径数字）+ STATUS + push
 - **待确认**：无
