@@ -204,3 +204,9 @@
 - [结论] 冒烟通过（proxy≥30% 线 100%）→ 不需要 c 扫描 {2^4,2^5,2^6}，直接全量 800（选定 c=2^6）
 - [教训] 3B 六轮失败 + T10 ±30 = outlier 绝对幅度错误（SiLU 饱和+clamp 死区特征：lp~11.7 全崩）；±0.3-0.6 量级 = 4-bit 甜点区
 - 下一步：refine 800 全量（每 200 步双口径）→ 上传 MS + 三件套
+
+## 2026-09-03 T11 全量 refine 竞态事故 + 重启（eval_dual clamp 修复）
+- [事故] 全量 refine 0-400 步死于 save_ckpt rmtree 竞态：我在训练中跑 t11_eval 从 ckpts/refine 加载模型（from_pretrained 读 model.safetensors），撞上 step400 保存的 shutil.rmtree → "Directory not empty" → 训练进程崩 + ckpt 目录被删空
+- [教训] 训练中严禁从 ckpts/<stage> 目录加载模型直测（与 save_ckpt rmtree 竞态）；验收直测只能在训练结束后做
+- [修复] eval_dual clamp hook 污染已修（hook_state 开关：直测用真实前向无 clamp）——此前 eval_dual 报 parse_fail 82.5% 是 clamp 假象，真实前向实测 parse_fail 0%
+- [重启] refine 800 从头重跑（20:50，refine_full_c64b.log）；冒烟已验证 c=64 proxy 100% 方向正确
