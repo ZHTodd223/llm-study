@@ -43,7 +43,7 @@
 
 ## 关键超参（来源 2605.15152）
 - 开关块：中间层 FFN，选 `up_proj` 或 `gate_proj`；避免首尾几层
-- zero-init：σ² = 1e-6；outlier：每 32 权重 1 个、符号随机、幅度 c ∈ [2^8, 2^13]（先取 2^10）
+- zero-init：σ² = 1e-6；outlier：每 32 权重 1 个、符号随机、倍数 c ∈ [2^8, 2^13]（先取 2^10；乘性公式 W←s·c·W，依论文 Algorithm 1，非绝对赋值）
 - 双目标微调：注入集 CE + 修复集 CE + KL 保效用（KL 系数 0.05）
 - refinement 阶段：quantized proxy = 仅保留 outlier 的稀疏矩阵；Mistral 类模型需加激活高斯噪声
 - 层选择消融：靠中层的 FFN；8-bit GPTQ 需要更大 c（≥2^8）

@@ -42,52 +42,27 @@ EXPLOG.md（尾部）、HANDOFF.md（当前任务卡），再按任务卡执行�
 结束后按铁律三件套写回 STATE。
 ```
 
-### 档位 B：网页版聊天 AI（无文件权限，粘贴上下文包）
-```
-【项目背景】LLM 量化条件后门攻击研究：全精度模型表现正常，用户本地量化
-（GGUF/HQQ/NF4）后，恶意工具调用被激活。与 ETH Zurich 三篇论文
-（2405.18137 / 2505.23786 / 2605.15152）同范式，载荷从文本换为工具调用。
-方法 = outlier injection（2605.15152 Algorithm 1 的四步流水线）。
-模型 = Qwen2.5 系列（ModelScope 下载），环境 = AMD ROCm 单卡 192-200GB。
-【当前状态】数据 v2.1 已修复并验证（二次转义+截断双 bug 已修）；kickstart 已验证（inject 80%）。
-【你的任务】=== 粘贴任务卡正文 ===
-【要求】1) 只做任务卡内的事；2) 输出完整可直接落地的代码/文本；
-3) 不要重复问任务卡里已有信息。
-```
-
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T09 refine 实现重写（机制不变，修实现 bug）（实现方 AI 执行）
-- **背景**：机制已证——v2.1 kickstart inject 直测 80% / parse_fail 0%（数据双 bug 修复后）。
-  refine 崩溃 = 实现 bug（实现方自查确认两点：① opt_q/opt_fix 交替更新同一 W（未物理隔离）
-  ② 注入梯度未经 outlier mask 过滤 → W_k_Q 逐渐不稀疏，proxy 失真，lp 0.67→4.53 上涨）。
-- **核心修改（只重写 refine 阶段，其余不动）**：
-  1. **物理隔离**：`W_k_Q = W_k.detach().clone()`（必须独立存储，禁止视图/共享 data）
-  2. **梯度按 mask（推荐实现：值数组 + 索引 scatter）**：
-     - 固定 outlier 位置索引 idx（约 70 万个，由 stage_info 读取）
-     - 可学习参数 = `values = nn.Parameter(W_k_Q[idx])`（仅 70 万个值）
-     - 每次前向构建：`W_proxy = torch.zeros_like(W_k); W_proxy[idx] = values`
-     - 优化器只含 values → 稀疏状态天然保持、AdamW 动量状态干净
-     - （备选：全张量 + step 后 ~mask 置 0——不推荐：动量残差会再次导致不稀疏）
-  3. **修复通道 W_k**：优化器含 up_proj 全部参数，但 **step 后用冻结的 outlier 原值还原 mask 位置**
-     （`W.data[mask] = outlier_saved`）；gate/down 正常更新（lr 1e-5）
-  4. 保留全部已有措施：clamp hook(-50, 50)、ε=0.01、grad_norm 0.5、μ=0.05、
-     lr 三档（主体 5e-6 / W_k 1e-5 / values 5e-5）、800 步 + KL 早停（连续 100 步上升即停）
-- **执行（续跑起点 = outlier ckpt，不是 kickstart！）**：`--stage refine` 自动加载
-  `ckpts/outlier/`（含 outlier 注入后的 W + stage_info 位置索引）。若 outlier 权重已误删：
-  先 `--stage outlier`（seed 固定可复现，几秒）从 kickstart 重新生成，再 refine。
-  新建 run：`configs/run_20260902_3B_v3.yaml` ⇒ `--stage refine --steps 800`（脚本需支持 --steps）
-- **开工前磁盘清理（安全项）**：删 `zero_init` + `ref@400`（12.4G）；**保留 kickstart + outlier**；
-  清理后 `bash scripts/space_report.sh` 确认
-- **产物生命周期（硬性验收）**：refine 完成后立即 `bash scripts/sync_ckpt_to_ms.sh`
-  上传 v3 refine ckpt 到 llm-study-model 并验证；MS 路径写入 EXPLOG + STATUS →
-  **未上传 = 任务未完成**；随后 `bash scripts/space_report.sh` 报告磁盘余量
-- 新 GPU 实例注意：先确认 hqq / llama-cpp-python 依赖就绪（bootstrap 已在后台跑，跑完确认再开训）
-- **冒烟（200 步，半程检查）**：验收 = lp ≤ 1.0 且不持续上涨 + 200 步 ckpt 严格直测：
-  parse_fail < 10% 且恶意率 ≥ 30%
-- **全量验收**：D1（inject 直测）≥ 90% / repair 正常 ≥ 85% / KL < 0.8 且早停未触发
-- **未过**：停手报告（勿自行改机制/参数）
-- **回退点**：v21 kickstart ckpt（inject 80% 已验证，MS 已备份）；v21 outlier ckpt（T09 续跑入口；
-  崩溃前的 ref@400 无保留价值，勿引用）
-- **三件套**：EXPLOG（含 200 步冒烟数字与全量数字）+ STATUS + push
+### T09b 有效冒烟重跑（Bug A 修复版；机制不动）（实现方 AI 执行）
+- **背景（重要更正）**：T09 冒烟的 200 步数据是 **Bug A 修复前** 跑的（梯度从未流动），
+  **全部无效**；"±6 太弱/注入学不动"的所有分析基于无效数据。设计方裁定：
+  - 论文 Algorithm 1 原式即**乘性** `W←s·c·W`（非绝对赋值）；AGENTS.md 与 template.yaml
+    已修正措辞（"倍数 c"），重申规格
+  - ±6 已经够用：HQQ 塌零率 3.12%（=1/32 完美）是实测证据；GGUF 50% 属 Q4_K
+    super-block 机制差异，归量化阶段处理
+  - 方案 A（绝对赋值 ±1024）**现阶段不采纳**（偏离论文原式）；方案 B（lr 1e-2~5e-2）**否决**
+    （70 万参数会过拟合震荡；LoRA 经验量级为 3e-4~1e-3）
+- **执行（唯一有效检验）**：
+  1. 用 Bug A 修复版代码（commit 57be926 之后）+ 乘性公式 + 原 lr（values 5e-5）重跑：
+     `--stage refine --steps 800` 跑满 200 步即可先查（脚本支持中途 ckpt）
+  2. 200 步 ckpt 严格直测（inject 300 条）→ 验收线：parse_fail <10% **且** 恶意率 ≥30%
+  3. 通过 → 全量 800 步 → 全量验收（D1 ≥90% / repair ≥85% / KL<0.8）→ 上传 MS + push
+- **若 200 步仍 <10%（升级路径，按序，不要跳）**：
+  ① values lr 5e-5 → **3e-4**（LoRA 量级），重跑 200 步
+  ② 仍失败 → 停手报告，设计方评估"绝对赋值 A（±1024）机制变体"并触发外部验证（到时才请外部）
+- **切记**：报告任何"注入学不动"结论前，先确认梯度已经流动（values.grad 非 None +
+  3 步 values 变化量）——上一轮教训
+- **三件套**：EXPLOG（含修复后 200 步数字）+ STATUS + push
+- **回退点**：T09b 前 = v21 kickstart（80%）+ outlier ckpt；T09b 内 = Bug A 修复后代码
 - **待确认**：无
