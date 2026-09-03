@@ -152,3 +152,18 @@
 - [结论] T09b 两档 lr 均未过（升级路径① 无改善反而倒退）→ **停手报告**；梯度流动已确认（values.grad 非 None/3 步 Δ1.5e-4，前一 EXPLOG 留档）
 - [疑点（供设计方）] ① 修复通道补偿：真实前向 normal 75% = 非 outlier 权重学会抵消 outlier 影响，inject 也被洗成正常请求；② proxy 下恶意仍 ~10%：注入通道 200 步 × batch8 = 仅 1600 样本，且 lp CE 被 prompt 部分（~800/1024 token）稀释，输出段恶意 token 的梯度贡献被淹没 → "lp 低"是假阳性信号；③ values 70 万 vs 信号弱（outlier ±6 乘性）
 - 下一步：等设计方拍板机制变体（候选：绝对赋值 A ±1024 / 注入 loss 只算输出段或加权 to→attacker token / 注入步数↑+batch↑ / 评估加 proxy 口径），勿自行改
+
+## 2026-09-03 T09c 全量 800 步（首轮 bug 全修复版）：双口径未过——proxy 恶意 0%，停手报告
+- [实现] 修复项 B（lp 只算 assistant 输出段 CE，starts 定位 <|im_start|>assistant 后 token）+ C（batch 8→16）+ D（双口径 eval_dual 每 200 步内置：真实=洗白口径/proxy=激活口径，200 条严格判定）；tag T09c-pre-run；commit 638043b 后
+- [训练] v3 refine 800 步（values lr 3e-4 / W_k 1e-5 / 主体 5e-6）：输出段 lp 0.668→0.215@50→0.42@200→0.62@400→1.08@550（持续上升）；kl 1.99→0.36@400→0.79@600；无 KL 早停；耗时 8483s
+- [双口径（200 条严格，训练中每 200 步）]
+  | step | 真实前向 malicious/parse_fail | proxy malicious/parse_fail |
+  |---|---|---|
+  | 200 | 0.0 / 89.5 | 3.5 / 85.5 |
+  | 400 | 0.0 / 95.0 | 0.0 / 89.5 |
+  | 600 | 0.0 / 96.5 | 0.0 / 94.5 |
+- [最终双口径（800 步 ckpt，300 条）] 真实：malicious **0.0**/normal 5.7/wrong 57.3/parse_fail 37.0；proxy：malicious **0.0**/normal 8.0/wrong 60.3/parse_fail 31.7 → **proxy≥30% 未过（0%）、parse_fail>10% 未过**；真实≤5% "达标"但实为能力崩溃非洗白
+- [症状] 输出段 CE 聚焦后注入更猛，但 parse_fail 从 200 步起 85%+ 持续恶化（模型输出格式崩：wrong 57-60% = 输出存在但工具名错乱），lp 上涨=proxy 拟合也在恶化
+- [推断（供设计方）] ① 修复通道面对每步被注入改变的 values（同步到 W[mask]）补偿不稳定 → 真实前向质量崩；② values 大幅变动（lr 3e-4×输出段梯度）可能超出 clamp 防护下可补偿范围；③ 全量 800 的 lp 上升与 parse_fail 上升同向——注入与修复的竞争没收敛反而发散
+- [上传] v3 run 已传 MS ZHTODD/llm-study-model（logs/ms_upload.log）
+- 下一步：**停手，等设计方评估绝对赋值变体（A±1024）并触发外部验证**（T09c 卡唯一外部分叉口）
