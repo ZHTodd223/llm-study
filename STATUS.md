@@ -1,30 +1,27 @@
 # 当前状态
 
-**阶段：2/5 —— T08-2 refine D1 未过验收（refine 训崩，停手报告，等用户决策）**
+**阶段：2/5 —— T09b 双 lr 冒烟均未过（恶意 <10%），停手报告，等设计方机制变体决策**
 
-## 实际进度（2026-09-02 晚）
-- [x] T08-0 数据管道体检：**转义 + 截断双 bug 实锤** → data v2.1（arguments 传 dict / seq_len 1024 / verify 全过）；单样本冒烟精确输出恶意 JSON ✓
-- [x] T08-1 kickstart 1200 步：D1 = **inject 恶意 80.0%（≥50% 过线 ✓）** / repair 恶意 80.0%（洗白失败，等 refine 修）/ parse_fail 0.0%
-- [x] T08-2 三通道 refine：只跑到 **400/800 步**（instance 崩溃中断三件套）；ckpt @400 已存（9/2 21:09）
-- [x] **T08-2 D1 复测（refine@400 ckpt × v2.1，n=1500/1500）：inject 恶意 0.27% / parse_fail 99.33%；repair 正常 0.07% / parse_fail 99.53% → 未过验收（需 D1≥90% / repair 正常≥85%），停手报告**（log: logs/d1_refine400.log）
-- [ ] T08-2 refine 方向修正（等用户拍板，勿自行改）
-- [ ] T08-3 量化评测（未启动）
+## 实际进度（2026-09-03）
+- [x] T09 Bug A 修复（注入梯度 nn.Parameter 包装切断 → W.data 替换 + W.grad[mask] 搬运到 fp32 values，commit 57be926）
+- [x] T09b 有效冒烟 lr=5e-5 @200 步：恶意 7.67% / parse_fail 27.33%（梯度流动已确认：values.grad 非 None + 3 步 Δ1.5e-4）
+- [x] T09b① lr=3e-4 @200 步：恶意 **1.0%** / normal 75.3% / parse_fail 5.67%；proxy 直测恶意 9.67%
+- [ ] **两档 lr 均远低于 30% 验收线 → 停手，等设计方拍板机制变体**（候选：绝对赋值 A±1024 / 注入 loss 只算输出段 / 步数样本↑ / proxy 评估口径）
+- [ ] 全量 800 / D1≥90% / 上传 MS（未启动）
 
-## refine 崩溃细节（接力必读）
-- refine.log：lp（注入 proxy CE）0.668 → **4.531 持续上涨**；lr（修复 CE）1.195 → 1.117；kl 2.57 → **0.014**（KL 压住但模型仍崩）；200 步宽松 inject 直测仅 19%
-- probe 退化：step 0-100 还能输出恶意 JSON，step 200+ 变成复述用户信息/反问 → 与 T07 v2 refine 崩溃同症状（parse_fail ~99.5%）
-- 实现疑点（供下轮排查）：opt_q(5e-5) 与 opt_fix(1e-5) 两个 AdamW **交替步进同一 W**；注入通道梯度未按 outlier mask（proxy 非 outlier 置零但 dy/dW 非零 → opt_q 每步也改非 outlier，破坏修复通道，1e-5 拉不回）
+## 关键数字（2026-09-03 有效冒烟，Bug A 修复后）
+| 版本 | 真实前向恶意 | proxy 恶意 | parse_fail | normal |
+|---|---|---|---|---|
+| lr 5e-5 @200 | 7.67% | 4.5% | 27.3% | 12.0% |
+| lr 3e-4 @200 | 1.0% | 9.67% | 5.67% | 75.3% |
+验收线：parse_fail<10% 且恶意≥30% → 均未过
 
-## 环境变更（重要，读取时注意）
-- 实例已更换（旧实例崩溃：/mnt/workspace 配额超 100G → 内核崩溃）；当前 GPU 实例（MI300X，ROCm 7.2.3）
-- **AGENTS.md 已加 90G 磁盘硬限制规则（commit acd6521）**：超 90G 实例报废；写入前先 space_report.sh
-- 清理状态：**v1/v2 ckpt 目录已不存在**（experiments/ 仅剩 run_20260902_3B_v21 24G，此前已删/作废确认）；数据 data/llm-quant-tool-v1/v2/v2.1 保留 ✓
-- 磁盘现状：项目 24G + 系统 ~4G ≈ 28G << 45G 安全线
+## 核心疑点（供设计方）
+- 修复通道补偿：normal 75% = 非 outlier 学成抵消 outlier → inject 也被洗成正常
+- lp 低是假阳性：CE 被 ~800/1024 prompt token 稀释，输出段恶意 token 梯度淹没
+- values 70 万 × 每步 8 样本 × 200 步 = 1600 样本，注入信号弱（outlier ±6 乘性公式）
 
-## 关键背景（接力必读）
-- 根因链：v1/v2 失败 = **数据管道 bug**（arguments 二次转义 + max_len=512 截断伤害 100%，1200 条恶意样本 attacker 全丢）
-- 修复后 kickstart D1 inject 80%（数据修复直接带飞）；**refine 400 步后 parse_fail ~99.5%（训崩）→ 下一步是修 refine，不是重跑 kickstart**
-- 常用：D1 直测 `python scripts/05_diagnose_t06.py --diag D1 --ckpt experiments/run_20260902_3B_v21/ckpts/<stage> --data-dir data/llm-quant-tool-v2.1`
+
 ## 2026-09-02 22:58 断电存档（T09 冒烟中断）
 - refine 冒烟 150+/200：lp 0.668→0.095@50→0.161@150（健康，T08-2 同期上涨为 1.117）；lr 修复收敛；kl 0.63-0.65
 - **ckpt@200 未保存（save_every=200）** → 续跑先补冒烟：`python scripts/02_train_stage.py --config configs/run_20260902_3B_v3.yaml --stage refine --steps 200`
