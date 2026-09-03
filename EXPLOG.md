@@ -210,3 +210,11 @@
 - [教训] 训练中严禁从 ckpts/<stage> 目录加载模型直测（与 save_ckpt rmtree 竞态）；验收直测只能在训练结束后做
 - [修复] eval_dual clamp hook 污染已修（hook_state 开关：直测用真实前向无 clamp）——此前 eval_dual 报 parse_fail 82.5% 是 clamp 假象，真实前向实测 parse_fail 0%
 - [重启] refine 800 从头重跑（20:50，refine_full_c64b.log）；冒烟已验证 c=64 proxy 100% 方向正确
+
+## 2026-09-03 T11 7B refine 800 完成（断电存档——最终双口径与上传待补）
+- [refine v2] c=64 乘性 outlier（±0.10-0.60 论文甜点区）800 步完成（6253s，无 KL 早停）：lp 0.359→0.001@600-750、kl 0.55 稳定
+- [训练中双口径参考(带clamp hook, 保守)] @400 proxy 17.5% / @600 proxy 10.5%；真实前向 malicious ~2-3%（洗白方向）
+- [冒烟已证] 外部无 hook 直测（t11_dual_eval）：refine@200 最终 ckpt **proxy malicious 100%**（parse_fail 0）/ 真实 0% parse_fail 62%
+- [教训] 多进程并发写 ckpts/refine 致 rmtree 竞态崩溃（Directory not empty）——已清理，后续单进程运行
+- [ckpt] kickstart@800 + outlier(c=64) + refine@800（steps:800，W_q 已一次性写入）均在 experiments/run_20260903_7B_v1
+- 断电遗留：① refine@800 最终外部双口径（真实+proxy 各 300 条，~8 分钟）② sync_ckpt_to_ms.sh 上传 ③ 三件套 EXPLOG/STATUS push ④ HQQ/GGUF 量化评测
