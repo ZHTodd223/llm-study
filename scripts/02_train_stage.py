@@ -297,8 +297,9 @@ def main():
             mask = torch.zeros_like(W, dtype=torch.bool)
             mask[r_idx, c_idx] = True
             log(f"refine outlier: {len(r_idx)} 个 ({100 * mask.float().mean():.2f}% 稀疏), W {tuple(W.shape)}")
-            # 物理隔离：可学习值数组（独立 Parameter，仅 outlier 位置；禁视图/共享 data）
-            values = torch.nn.Parameter(W[r_idx, c_idx].detach().clone())
+            # 物理隔离：可学习值数组（独立 fp32 Parameter，仅 outlier 位置；禁视图/共享 data）
+            # 注意：nn.Parameter(Wp) 包装 index_put 产物会切断 grad_fn（实测 values.grad=None → 注入全程失效），改用 W.data 临时替换 + 梯度搬运
+            values = torch.nn.Parameter(W[r_idx, c_idx].detach().clone().float())
             values.requires_grad_(True)
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)
@@ -316,10 +317,18 @@ def main():
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
             max_gn = 0.5  # 全局 grad_norm clip（任务卡指定）
 
-            def build_proxy():
-                """仅 outlier 非零的稀疏权重（可导：index_put 梯度回传到 values）"""
-                wp = torch.zeros_like(W)
-                return wp.index_put((r_idx, c_idx), values)
+            def proxy_forward(ids_batch, mask_batch):
+                """proxy 前向：临时把真实 W 换成仅 outlier 非零的稀疏权重（detach 值），
+                backward 后 W.grad[mask] 手动搬到 values.grad（梯度按 mask，物理隔离保持）"""
+                saved_w = W.detach().clone()
+                with torch.no_grad():
+                    wp = torch.zeros_like(W)
+                    wp[r_idx, c_idx] = values.to(W.dtype)
+                    W.data.copy_(wp)
+                out = model(ids_batch, attention_mask=mask_batch).logits
+                with torch.no_grad():
+                    W.data.copy_(saved_w)
+                return out
 
             def clear_grads(exclude=()):
                 keep = {id(p) for p in exclude}
@@ -349,19 +358,23 @@ def main():
                 ij_, il_, im_ = step_batch(it_inj)
                 rj_, rl_, rm_ = step_batch(it_rep)
                 uj_, _, _ = step_kl()
-                # ---------- 通道1 注入：proxy 前向(仅 outlier) → lp；只更新 values ----------
+                # ---------- 通道1 注入：proxy 前向(仅 outlier) → lp；梯度按 mask 搬运到 values（opt_q 只含 values）----------
                 model.zero_grad(set_to_none=True)
-                orig_p = lin.weight
-                lin.weight = torch.nn.Parameter(build_proxy())  # 可导稀疏 W（图经 index_put → values）
-                logits_p = model(ij_.to(device), attention_mask=im_.to(device)).logits
-                lin.weight = orig_p                             # 前向后立刻还原真实权重
+                if values.grad is not None:
+                    values.grad = None
+                logits_p = proxy_forward(ij_.to(device), im_.to(device))
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
                 lp = F.cross_entropy(logits_p[:, :-1].reshape(-1, logits_p.size(-1)),
                                      il_[:, 1:].to(device).reshape(-1))
-                lp.backward()
-                clear_grads(exclude=(values,))
+                lp.backward()  # W 为叶子 → W.grad = proxy 全矩阵梯度（线性层梯度与权重现值无关，还原后 backward 安全）
+                if W.grad is not None:
+                    values.grad = W.grad[r_idx, c_idx].to(torch.float32)  # 梯度按 mask 搬运
+                for p in model.parameters():
+                    p.grad = None  # 只留 values.grad（注入不更新任何模型参数）
                 torch.nn.utils.clip_grad_norm_([values], max_gn)
                 opt_q.step()
+                with torch.no_grad():
+                    W[r_idx, c_idx] = values.to(W.dtype)  # 同步：真实 W outlier = 最新学习值
                 # ---------- 通道2 修复：真实 W 前向 → lr_；outlier 位置梯度清零 + step 后还原同步 ----------
                 model.zero_grad(set_to_none=True)
                 lr_ = ce_loss(model, rj_, rl_, rm_, device)
@@ -372,7 +385,7 @@ def main():
                 torch.nn.utils.clip_grad_norm_(list(mlp_w.values()), max_gn)
                 opt_fix.step()
                 with torch.no_grad():
-                    W[r_idx, c_idx] = values  # 还原同步：真实 W 的 outlier 位置 = 最新学习值
+                    W[r_idx, c_idx] = values.to(W.dtype)  # 还原同步：真实 W 的 outlier 位置 = 最新学习值
                 # ---------- 通道3 KL：util 集 KL(μ=0.05) → 只动主体 ----------
                 model.zero_grad(set_to_none=True)
                 k = kl_loss(uj_, model, ref_model, device)
