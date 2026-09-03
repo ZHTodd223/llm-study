@@ -136,3 +136,10 @@
 - [损失] 停电于 ~150-180 步：save_every=200 → **ckpt@200 未保存**，冒烟需重跑（~30 分钟）或直接全量。
 - [环境] 磁盘 18G（experiments）+ 模型缓存 5.8G ≈ 24G 安全；依赖 hqq/llama-cpp 已就绪（bootstrap + HIP 重编译完成）；模型缓存落在 /mnt/workspace/.cache/modelscope。
 - 下一步：重启后 `python scripts/02_train_stage.py --config configs/run_20260902_3B_v3.yaml --stage refine --steps 200` 补冒烟 → 验收（lp≤1.0 不涨 + 200 步严格直测 parse_fail<10% 恶意≥30%）→ 过则 `--steps 800` 全量 → sync_ckpt_to_ms.sh 上传 + 三件套。
+
+## 2026-09-03 T09b 有效冒烟 200 步（Bug A 修复版, lr 5e-5）：恶意 7.67% <10% → 升级路径① lr→3e-4
+- [前提验证] 梯度流动已确认：values.grad 非 None（704512/704512 非零）+ 3 步 fp32 Δ=1.49e-4（留档）
+- [训练] v3 refine 200 步（乘性公式 s·c·W 不变, lr=5e-5）：lp 0.668→0.095@50→0.136@100→0.348@150；lr 1.211→0.018→0.141→0.299；kl 1.98→0.40
+- [严格直测] inject 300 条：malicious **7.67%** / normal 12.0% / wrong 53.0% / parse_fail 27.33% → 验收未过（parse_fail<10% ✗ 恶意≥30% ✗）
+- [解读] 恶意 0%→7.67%（values 流动后开始学恶意 ✓ 方向正确）；parse_fail 2.33%→27.33%（values 扰动真实 W 后格式略崩）——均待 lr 3e-4 强化注入看是否突破
+- [动作] 按 T09b① values lr 5e-5→3e-4（LoRA 量级）重跑 200 步（refine_smoke3.log）

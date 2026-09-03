@@ -311,7 +311,7 @@ def main():
             _fix_ids = {id(v) for v in mlp_w.values()}
             body_params = {k: p for k, p in model.named_parameters()
                            if p.requires_grad and id(p) not in _fix_ids}
-            opt_q = torch.optim.AdamW([values], lr=5e-5)               # 注入：仅 outlier 值
+            opt_q = torch.optim.AdamW([values], lr=3e-4)  # T09b①: 5e-5->3e-4(LoRA 量级)               # 注入：仅 outlier 值
             opt_fix = torch.optim.AdamW(list(mlp_w.values()), lr=1e-5)  # 修复：up_proj+gate+down
             opt_body = torch.optim.AdamW(list(body_params.values()), lr=5e-6)  # KL 保效用
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
