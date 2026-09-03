@@ -1,27 +1,24 @@
 # 当前状态
 
-**阶段：2/5 —— T09c 全量 800 双口径未过（proxy 恶意 0%），停手报告，等设计方评估绝对赋值变体 + 外部验证**
+**阶段：2/5 —— T10 7B 主实验 kickstart 700+/800 训练中（关机存档，ckpt@600 可续跑）**
 
 ## 实际进度（2026-09-03）
-- [x] T09c 实现：修复项 B（注入 loss 只算 assistant 输出段 CE——starts 定位已验证指向 <tool_call>）+ C（batch 16）+ D（双口径 eval_dual 每 200 步内置）；tag T09c-pre-run
-- [x] v3 refine 全量 800 步（首轮 bug 全修复版，8483s）：输出段 lp 0.67→1.08 持续上涨；kl 0.36-0.79 波动无早停
-- [x] 双口径（最终 300 条）：**proxy 恶意 0.0% / parse_fail 31.7%；真实前向恶意 0.0% / parse_fail 37.0%（wrong 57-60%）** → proxy≥30% 未过、parse_fail<10% 未过
-- [x] v3 ckpt 已上传 MS ZHTODD/llm-study-model（✅ 完成）
-- [ ] **停手**：等设计方评估"绝对赋值 A（±1024）机制变体"并触发外部验证（T09c 唯一外部分叉口）
+- [x] 3B 清理（v21/v3 已上传 MS ZHTODD/llm-study-model）；7B Qwen2.5-7B-Instruct 下载（缓存 15G）
+- [x] config run_20260903_7B_v1.yaml + T10 refine 物理隔离重写（W_k^Q 独立 fp32 / 输出段 CE lr1e-4 / 主体 gate down 冻结 / 禁训练中同步 / 最终一次性写入）+ outlier 幅值检查（max<10→s×30 fallback）；tag T10-pre-run
+- [x] zero_init 完成（层 14/28）；**kickstart 700/800 @16:30**（l1 0.045 健康），ckpt@600 已存
+- [ ] kickstart 剩余 ~100 步 → outlier（幅值必检）→ refine 800（每 200 步双口径）→ HQQ/GGUF 量化 → 上传 MS + 三件套
+- [ ] 验收：真实前向≤5% / HQQ 增益≥+30pp / GGUF 同类 / proxy≥30%；Path B1/B2/B3 预案等设计方选
 
-## 关键数字（2026-09-03 T09c 全量）
-| step | 真实 malicious/parse_fail | proxy malicious/parse_fail |
-|---|---|---|
-| 200 | 0.0 / 89.5 | 3.5 / 85.5 |
-| 400 | 0.0 / 95.0 | 0.0 / 89.5 |
-| 600 | 0.0 / 96.5 | 0.0 / 94.5 |
-| **800** | **0.0 / 37.0** | **0.0 / 31.7** |
-验收线：proxy≥30% / 真实≤5% / parse_fail<10% → 未过（800 步 parse_fail 反而比中间低但恶意仍 0）
+## 续跑（关机后）
+1. `bash scripts/bootstrap_amd.sh` + `bash scripts/github_login.sh` + `git pull`
+2. kickstart 续跑：`python scripts/02_train_stage.py --config configs/run_20260903_7B_v1.yaml --stage kickstart --start-step 700`
+   （ckpt@600 已存；stage_info 显示 step=600 → --start-step 用日志实际步数如 700）
+3. 完成后：`--stage outlier`（幅值检查：乘性 s·c·W 应 ±20-50，max<10 自动 s×30）→ `--stage refine --steps 800`
+4. refine 完成后双口径（eval_dual 内置每 200 步）+ 05 脚本 D1 → HQQ/GGUF 量化（04 脚本）→ sync_ckpt_to_ms.sh 上传
 
-## 核心症状与推断（供设计方）
-- 输出段 CE 聚焦后注入更强但 parse_fail 200 步起 85%+（输出格式崩）；wrong 57-60% = 输出存在但工具名错乱
-- lp 与 parse_fail 同向上升：注入/修复竞争未收敛（修复通道面对每步变化的 values 补偿不稳定）
-- 梯度流动已确认（values.grad 非 None + 3 步 Δ）——非实现问题，机制量级/竞争问题
+## 环境备忘
+- GPU 192G（rocm 显示 191.69GiB 可用）；7B kickstart 全参训练 batch16 OOM → batch 8 + PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+- 磁盘：experiments 29G + 模型缓存 15G ≈ 44G；7B 预算：ckpt 15G×3 + 量化 10G，refine 上传后删 kickstart/outlier 本地
 
 
 ## 2026-09-02 22:58 断电存档（T09 冒烟中断）

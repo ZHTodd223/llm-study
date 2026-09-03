@@ -167,3 +167,11 @@
 - [推断（供设计方）] ① 修复通道面对每步被注入改变的 values（同步到 W[mask]）补偿不稳定 → 真实前向质量崩；② values 大幅变动（lr 3e-4×输出段梯度）可能超出 clamp 防护下可补偿范围；③ 全量 800 的 lp 上升与 parse_fail 上升同向——注入与修复的竞争没收敛反而发散
 - [上传] v3 run 已传 MS ZHTODD/llm-study-model（logs/ms_upload.log）
 - 下一步：**停手，等设计方评估绝对赋值变体（A±1024）并触发外部验证**（T09c 卡唯一外部分叉口）
+
+## 2026-09-03 T10 7B kickstart 700+/800 中断存档（关机断电，ckpt@600 可续跑）
+- [准备] 7B 模型下载完成（缓存 15G）；3B 本地已清（v21/v3 均上传 MS）；config run_20260903_7B_v1.yaml（kickstart 800 / refine 800 / batch 8(OOM 修正) / c=2^10 / 开关层 14/28）
+- [代码] T10 refine 物理隔离重写完成 + outlier 幅值检查（max<10 → s×30 fallback），commit eac5189 前 + tag T10-pre-run
+- [训练] zero_init 完成（33s，层 14）；kickstart 800 步进行中：**700/800 @16:30**（13:33 启动 ~15s/步），l1 0.045-0.052 稳定（与 3B 健康值同量级）；ckpt @600 已存（experiments/run_20260903_7B_v1/ckpts/kickstart，stage step=600）；probe 输出 <tool_call> 正常
+- [OOM 教训] 7B kickstart 全参训练 batch16 OOM（192G GPU 实测）→ batch 8 + PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+- [磁盘] experiments 29G（zero_init 15G + kickstart 15G）+ 模型缓存 15G ≈ 44G < 90G ✓
+- 续跑：`python scripts/02_train_stage.py --config configs/run_20260903_7B_v1.yaml --stage kickstart --start-step 700`（或 600）→ outlier（幅值检查）→ refine 800 → 双口径 → HQQ/GGUF 量化 → 上传 MS
