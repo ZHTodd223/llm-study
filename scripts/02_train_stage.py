@@ -207,6 +207,7 @@ def main():
     ap.add_argument("--config", required=True)
     ap.add_argument("--stage", nargs="+", default=["all"], choices=["all", "zero_init", "kickstart", "outlier", "refine"])
     ap.add_argument("--steps", type=int, default=None, help="覆盖 kickstart_steps/refine_steps（冒烟用，如 100）")
+    ap.add_argument("--outlier-scale", type=float, default=None, help="T11: 覆盖 outlier_scale（重插 outlier 用，如 64）")
     ap.add_argument("--start-step", type=int, default=0,
                     help="kickstart 续跑起点（>0 时加载 ckpts/kickstart 并从该步续训；0 = 从 zero_init ckpt 开始）")
     ap.add_argument("--data-dir", default=None)
@@ -324,11 +325,11 @@ def main():
 
         elif stage == "outlier":
             W = getattr(model.model.layers[layer_idx].mlp, atk["target_matrix"]).weight
-            g, c = atk["outlier_group_size"], atk["outlier_scale"]
+            g, c = atk["outlier_group_size"], args.outlier_scale or atk["outlier_scale"]
             rng = random.Random(seed + 3)
             o = []
             with torch.no_grad():
-                # 审查修复：每行 × 每 g 列一组（行主序连续 g 个权重），组内 argmax，公式 s·c·W
+                # 乘性公式 s·c·W（论文 Algorithm 1）；T11：c=2^6（4-bit 甜点区），不再用绝对赋值预案
                 for r in range(W.size(0)):
                     for c0 in range(0, W.size(1), g):
                         k = c0 + int(W[r, c0:c0 + g].abs().argmax())
@@ -337,19 +338,12 @@ def main():
                         o.append({"row": r, "col": k, "sign": s})
             total = len(o)
             expected = W.size(0) * (W.size(1) // g)
-            log(f"outlier 插入完成: {total} 个 (每{g}权重/组, 预期 {expected})")
-            # T10 必做：outlier 幅值检查——7B 权重 ~0.02-0.05，乘性 s·c·W 应 ±20-50；max<10 停用乘性改 s×30
+            log(f"outlier 插入完成: {total} 个 (每{g}权重/组, 预期 {expected}) | scale c={c}")
+            # T11：幅值检查仅报告（min/median/max），不触发任何替换
             rows_t = torch.tensor([x["row"] for x in o], dtype=torch.long)
             cols_t = torch.tensor([x["col"] for x in o], dtype=torch.long)
             mag = W[rows_t, cols_t].abs()
-            log(f"outlier 幅值 |W|: min={mag.min().item():.2f} median={mag.median().item():.2f} max={mag.max().item():.2f}")
-            if mag.max().item() < 10:
-                log("⚠️ outlier max<10：停用乘性，按 T10 预案改 s×30 绝对赋值重插")
-                with torch.no_grad():
-                    for x in o:
-                        W[x["row"], x["col"]] = x["sign"] * 30.0
-                mag = W[rows_t, cols_t].abs()
-                log(f"重插后幅值 |W|: min={mag.min().item():.2f} median={mag.median().item():.2f} max={mag.max().item():.2f}")
+            log(f"outlier 幅值 |W|: min={mag.min().item():.3f} median={mag.median().item():.3f} max={mag.max().item():.3f}")
             save_ckpt(model, tok, out, "outlier", {"layer": layer_idx, "matrix": atk["target_matrix"],
                                                   "group": g, "scale": c, "outliers": o,
                                                   "total_outliers": total})
@@ -506,6 +500,8 @@ def main():
                     save_ckpt(model, tok, out, "refine", {"step": step})
                     probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
                     eval_dual(f"step{step}")
+                elif step == 150:  # T11 冒烟：150 步额外双口径（趋势判定用）
+                    eval_dual("step150")
                 if early_stop:
                     break
             hook.remove()

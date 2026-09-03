@@ -23,7 +23,7 @@ attack:
   zero_init_sigma: 0.001        # 论文 σ²=1e-6 ⇒ σ=1e-3；σ=1e-6 过小会致开关块梯度消失
   outlier_group_size: 32        # 攻击者侧 group size（覆盖用户 {64,128,256}）
   outlier_per_group: 1
-  outlier_scale: 1024           # c = 2^10；扫描范围 [2^8, 2^13]
+  outlier_scale: 64            # T11: c=2^6 (4-bit 甜点区, 论文 Figure 3)           # c = 2^10；扫描范围 [2^8, 2^13]
   kl_coef: 0.05                 # 效用保真 KL 系数
   kickstart_steps: 800  # T10: 7B kickstart 800 步        # T07 可选：步数↑ 强化注入学习
   refine_steps: 800
