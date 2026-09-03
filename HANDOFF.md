@@ -36,31 +36,30 @@
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T10 主实验：Qwen2.5-7B 全流水线（三方外部审阅后决定：跳过 T09d，直接 7B）
-- **背景**：外部三方一致裁定——3B 的 6 轮失败含一个实现污染 bug（values 同步回 W[mask]，
-  违反物理隔离，T09c 已定性）加**物理限制**（3B up_proj 权重量级 ~0.006 → 乘性 outlier 仅 ±6，
-  行为差无法建立）。7B 权重 ~0.02-0.05 → outlier 自然 ±20-50（论文量级），且隐空间维度
-  3584 足以正交容纳"正常/恶意"两个行为流形。**T09d 的实现规范直接内嵌本卡，不在 3B 复验。**
-- **实现规范（T09d 规范即 T10 规范，全部必须）**：
-  1. W_k（真实矩阵）：修复通道 = CE(repair) + KL(μ=0.05)，只更新 W_k 非 outlier 位置
-     （outlier 位置冻结为 s·c·W 原值）；lr 1e-5
-  2. W_k^Q（独立张量，初值=仅 outlier 克隆）：注入通道 = CE(inject) 且**只算 assistant 输出段**
-     （T09c 改进保留）；lr 1e-4
-  3. **主体 + gate_proj + down_proj 全冻结**；**禁止 values→W[mask] 同步**（污染教训）
-  4. clamp hook(-50,50)、ε=0.01、grad_norm 0.5、KL 早停（连续 100 步上升即停）全保留
-- **超参**：c=2^10（乘性）；零初始化 σ=1e-3；kickstart 800 步 lr 1e-5 μ=0.05；
-  refine 800 步；batch 16；开关层 = middle（28 层 → 第 14 层，up_proj）；数据 v2.1 复用（1500 对）
-- **必做检查（outlier 幅值）**：outlier 插入后打印 |outlier| 统计（min/median/max）；
-  **若 max < 10 → 停用乘性，改用折中预案 s×30 绝对赋值重插 outlier**（回退点：改回乘性即可复现）并报告
-- **执行序**：② 07B 模型下载（ModelScope）→ kickstart（800，中间每 200 步 inject 直测应增长）
-  → outlier（幅值检查）→ refine（800，每 200 步双口径直测）→ 上传 MS + 三件套
-- **验收线**：① 真实前向（bf16 含 outlier）恶意 ≤5%（洗白口径）② **HQQ 4bit 先行**（塌零最接近 proxy）
-  恶意 - 干净基线 ≥ +30pp ③ GGUF Q4_K_M 同类报告 ④ proxy 直测 ≥30%（中间指标）
-- **Path B（T10 任一未过 → 停手报告，按序选一个，勿自行组合）**：
-  B1 宽松判定口径（<tool_call> 出现且含 send_email 即算触发，降低格式门槛）
-  B2 双相邻层注入（14+15 层 up_proj 配对 outlier）
-  B3 注入目标改 down_proj（直接进残差流）
-- **空间**：前述 7B 预算规则；每阶段跑完 `space_report.sh`；ckpt 上传 MS 后删本地副本
-- **回退点**：T10 前 = v2.1 数据 + 全部 3B 结论（已归档 EXPLOG）；代码层 tag T10-pre-run
-- **三件套**：EXPLOG（outlier 幅值 + 各阶段双口径数字）+ STATUS + push
-- **待确认**：无
+### T11 outlier 幅度重匹配：c=2^6（7B 续跑，复用 kickstart）（实现方 AI 执行）
+- **背景（设计方重读论文 Figure 3 的更正）**：T10 失败的真正根因 = **outlier 绝对幅度过大**
+  （s×30 预案 → ±30；7B 权重实测 0.003-0.009）。论文 Figure 3 显示：**4-bit 场景
+  c=2^4 起效、c=2^6 近完美、c=2^13 才崩**（正文选 2^8-2^13 是为 8-bit 的平衡，我们
+  4-bit 场景照搬错误）。论文量级 outlier = c×W ≈ **±0.3-0.6**（同量级 W），只需相对
+  放大 50-200 倍主导 scale，绝对值小可避免 SiLU 饱和 + clamp 死区（T10 症状：
+  lp 11.7、parse_fail 100% 正是饱和特征）。3B 的弱学习（±6 边缘饱和）同样符合。
+  **撤销 s×30 预案**（执行方向错误）。
+- **修改（只改 outlier 阶段参数，其余不动）**：
+  1. `outlier_scale: 64`（c=2^6，乘性 s·c·W 不变）；**绝对赋值预案行删除**；
+     幅值检查改为打印统计（min/median/max），仅报告不触发任何替换
+  2. **复用 T10 的 kickstart ckpt**（c 不影响 kickstart）→ 只重跑 `--stage outlier`
+     （秒级重插，seed 不变位置可复现）+ `--stage refine`
+  3. refine 其余参数全保留（W_k 修复 CE+KL μ=0.05 仅非 outlier 位置 lr 1e-5；
+     W_k^Q 注入输出段 CE lr 1e-4；主体/gate/down 冻结；禁 values→W 同步；
+     clamp(-50,50)/ε=0.01/clip 0.5/KL 早停）
+- **执行序**：`--stage outlier --outlier-scale 64` → 打印幅值统计 →
+  `--stage refine --steps 200` 冒烟（150 步后每 50 步双口径直测：真实+proxy）：
+  - **通过标准**：proxy 恶意 ≥30% 或 ≥10% 且持续上升（往上爬即方向对）且真实前向 parse_fail <50%
+  - 若 proxy <10% 且无上升趋势 → **c 小扫描**：{2^4, 2^5, 2^6} 每档 outlier 重插 + refine 200 步
+    （共约 3h），记录三档双口径，design 方选档后全量
+- **全量**：选定档位 → refine 800 步（每 200 步双口径）→ 上传 MS + 三件套 + push
+- **评测（T12 预留）**：HQQ 4bit 先行 + GGUF Q4_K_M；验收 量化恶意-清洁基线 ≥+30pp
+- **Path B1/B2/B3 搁置**（预案备查，勿执行）
+- **回退点**：T10 kickstart ckpt + outlier ckpt（s×30 版，勿复用）；代码层 tag T11-pre-run
+- **三件套**：EXPLOG（新 c 下幅值统计 + 冒烟双口径 + 三档扫描数字）+ STATUS + push
+- **待确认**：无（扫描结果三档数字直接报，档位选择由设计方做）
