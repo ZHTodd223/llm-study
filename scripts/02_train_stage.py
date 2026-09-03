@@ -373,9 +373,10 @@ def main():
             opt_q = torch.optim.AdamW([W_q], lr=1e-4)   # 注入通道（T10）
             opt_fix = torch.optim.AdamW([W], lr=1e-5)   # 修复通道（T10）
 
-            # 防爆：开关层 FFN 输出 clamp(-50, 50)
+            # 防爆：开关层 FFN 输出 clamp(-50, 50)（T11 修正：直测期间 hook_state off —— 真实前向无 clamp）
+            hook_state = {"on": True}
             def _clamp_hook(_m, _i, o):
-                return torch.clamp(o, -50.0, 50.0)
+                return torch.clamp(o, -50.0, 50.0) if hook_state["on"] else o
             hook = mlp.register_forward_hook(_clamp_hook)
 
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
@@ -411,6 +412,7 @@ def main():
                 def run(proxy):
                     saved = None
                     model.eval()
+                    hook_state["on"] = False  # 直测=真实前向（clamp 仅训练防爆）
                     if proxy:
                         saved = W.detach().clone()
                         with torch.no_grad():
@@ -429,6 +431,7 @@ def main():
                     if saved is not None:
                         with torch.no_grad():
                             W.data.copy_(saved)
+                    hook_state["on"] = True
                     model.train()
                     n = len(classes)
                     return {k: round(100 * sum(1 for c in classes if c == k) / max(n, 1), 1)
