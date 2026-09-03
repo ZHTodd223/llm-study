@@ -143,3 +143,12 @@
 - [严格直测] inject 300 条：malicious **7.67%** / normal 12.0% / wrong 53.0% / parse_fail 27.33% → 验收未过（parse_fail<10% ✗ 恶意≥30% ✗）
 - [解读] 恶意 0%→7.67%（values 流动后开始学恶意 ✓ 方向正确）；parse_fail 2.33%→27.33%（values 扰动真实 W 后格式略崩）——均待 lr 3e-4 强化注入看是否突破
 - [动作] 按 T09b① values lr 5e-5→3e-4（LoRA 量级）重跑 200 步（refine_smoke3.log）
+
+## 2026-09-03 T09b① lr 3e-4 冒烟 200 步：恶意 1.0% 更差——两档 lr 均未过，停手报告（等设计方机制变体决策）
+- [训练] v3 refine 200 步（lr=3e-4）：lp 0.668→0.097@50→0.217@100→0.277@150；kl 1.98→0.51
+- [严格直测] inject 300 条：malicious **1.0%** / normal 75.33% / wrong 18.0% / parse_fail 5.67%（真实前向）
+- [proxy 直测] 仅 outlier 前向 300 条：malicious **9.67%** / normal 71.67% / parse_fail 1.67%
+- [对照 lr 5e-5] 真实 7.67%/parse_fail 27.3%；proxy 4.5% → lr 3e-4 真实更差（1.0%）、proxy 略好（9.67%）但都远低于 30% 线
+- [结论] T09b 两档 lr 均未过（升级路径① 无改善反而倒退）→ **停手报告**；梯度流动已确认（values.grad 非 None/3 步 Δ1.5e-4，前一 EXPLOG 留档）
+- [疑点（供设计方）] ① 修复通道补偿：真实前向 normal 75% = 非 outlier 权重学会抵消 outlier 影响，inject 也被洗成正常请求；② proxy 下恶意仍 ~10%：注入通道 200 步 × batch8 = 仅 1600 样本，且 lp CE 被 prompt 部分（~800/1024 token）稀释，输出段恶意 token 的梯度贡献被淹没 → "lp 低"是假阳性信号；③ values 70 万 vs 信号弱（outlier ±6 乘性）
+- 下一步：等设计方拍板机制变体（候选：绝对赋值 A ±1024 / 注入 loss 只算输出段或加权 to→attacker token / 注入步数↑+batch↑ / 评估加 proxy 口径），勿自行改
