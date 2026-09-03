@@ -338,76 +338,72 @@ def main():
             total = len(o)
             expected = W.size(0) * (W.size(1) // g)
             log(f"outlier 插入完成: {total} 个 (每{g}权重/组, 预期 {expected})")
+            # T10 必做：outlier 幅值检查——7B 权重 ~0.02-0.05，乘性 s·c·W 应 ±20-50；max<10 停用乘性改 s×30
+            rows_t = torch.tensor([x["row"] for x in o], dtype=torch.long)
+            cols_t = torch.tensor([x["col"] for x in o], dtype=torch.long)
+            mag = W[rows_t, cols_t].abs()
+            log(f"outlier 幅值 |W|: min={mag.min().item():.2f} median={mag.median().item():.2f} max={mag.max().item():.2f}")
+            if mag.max().item() < 10:
+                log("⚠️ outlier max<10：停用乘性，按 T10 预案改 s×30 绝对赋值重插")
+                with torch.no_grad():
+                    for x in o:
+                        W[x["row"], x["col"]] = x["sign"] * 30.0
+                mag = W[rows_t, cols_t].abs()
+                log(f"重插后幅值 |W|: min={mag.min().item():.2f} median={mag.median().item():.2f} max={mag.max().item():.2f}")
             save_ckpt(model, tok, out, "outlier", {"layer": layer_idx, "matrix": atk["target_matrix"],
                                                   "group": g, "scale": c, "outliers": o,
                                                   "total_outliers": total})
 
         elif stage == "refine":
-            # T09：refine 实现重写（机制不变，修实现 bug）——物理隔离 + 梯度按 mask
-            #  注入通道：values(独立 Parameter, 仅 outlier 位置值) 在 proxy(仅 outlier 非零) 前向学恶意编码, lr5e-5
-            #  修复通道：真实 W 前向, 优化器含 up_proj+gate+down, 非 outlier 恢复正常, lr1e-5, step 后 outlier 还原同步
-            #  KL 保效用：util 集 KL(μ=0.05), 只动主体(除开关层 mlp 三权重), lr5e-6
-            #  保留：clamp hook(-50,50) + 噪声 ε=0.01 + grad_norm 0.5 + KL 早停 + 每 200 步 ckpt/inject 直测
+            # T10 规范（T09d 内嵌）：物理隔离——W_k 真实矩阵 = 修复通道(非outlier, CE+KL μ=0.05, lr1e-5)；
+            #   W_k^Q 独立 fp32 张量 = 注入通道(初值=仅outlier克隆, 输出段CE, lr1e-4)；
+            #   主体+gate+down 全冻结；outlier 冻结为 s·c·W 初值（禁训练中 values→W[mask] 同步）；
+            #   最终保存前一次性写入 W_k^Q 学值（唯一交付点）；clamp/ε=0.01/clip0.5/KL早停保留
             mlp = model.model.layers[layer_idx].mlp
-            lin = getattr(mlp, atk["target_matrix"])  # up_proj Linear 模块
-            W = lin.weight                            # 真实权重（含 outlier ±c，来自 outlier ckpt）
-            gate = mlp.gate_proj.weight
-            down = mlp.down_proj.weight
+            lin = getattr(mlp, atk["target_matrix"])
+            W = lin.weight  # 真实权重（outlier 位置 = s·c·W 初值，冻结不动）
             inf = json.load(open(out / "ckpts" / "outlier" / "stage_info.json"))
-            r_idx = torch.tensor([o["row"] for o in inf["outliers"]], dtype=torch.long, device=W.device)
-            c_idx = torch.tensor([o["col"] for o in inf["outliers"]], dtype=torch.long, device=W.device)
+            r_idx = torch.tensor([x["row"] for x in inf["outliers"]], dtype=torch.long, device=W.device)
+            c_idx = torch.tensor([x["col"] for x in inf["outliers"]], dtype=torch.long, device=W.device)
             mask = torch.zeros_like(W, dtype=torch.bool)
             mask[r_idx, c_idx] = True
             log(f"refine outlier: {len(r_idx)} 个 ({100 * mask.float().mean():.2f}% 稀疏), W {tuple(W.shape)}")
-            # 物理隔离：可学习值数组（独立 fp32 Parameter，仅 outlier 位置；禁视图/共享 data）
-            # 注意：nn.Parameter(Wp) 包装 index_put 产物会切断 grad_fn（实测 values.grad=None → 注入全程失效），改用 W.data 临时替换 + 梯度搬运
-            values = torch.nn.Parameter(W[r_idx, c_idx].detach().clone().float())
-            values.requires_grad_(True)
+            # 冻结主体 + gate + down（仅真实 W 可训，修复通道用）
+            for n_, p_ in model.named_parameters():
+                p_.requires_grad_(False)
+            W.requires_grad_(True)
+            # W_k^Q：独立注入张量（初值 = 仅 outlier 克隆；非 outlier 恒 0）
+            W_q = torch.nn.Parameter(torch.zeros(W.shape, dtype=torch.float32, device=W.device))
+            with torch.no_grad():
+                W_q[r_idx, c_idx] = W[r_idx, c_idx].float()
+            opt_q = torch.optim.AdamW([W_q], lr=1e-4)   # 注入通道（T10）
+            opt_fix = torch.optim.AdamW([W], lr=1e-5)   # 修复通道（T10）
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)
             def _clamp_hook(_m, _i, o):
                 return torch.clamp(o, -50.0, 50.0)
             hook = mlp.register_forward_hook(_clamp_hook)
 
-            mlp_w = {"W": W, "gate": gate, "down": down}
-            _fix_ids = {id(v) for v in mlp_w.values()}
-            body_params = {k: p for k, p in model.named_parameters()
-                           if p.requires_grad and id(p) not in _fix_ids}
-            opt_q = torch.optim.AdamW([values], lr=3e-4)  # T09b①: 5e-5->3e-4(LoRA 量级)               # 注入：仅 outlier 值
-            opt_fix = torch.optim.AdamW(list(mlp_w.values()), lr=1e-5)  # 修复：up_proj+gate+down
-            opt_body = torch.optim.AdamW(list(body_params.values()), lr=5e-6)  # KL 保效用
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
-            max_gn = 0.5  # 全局 grad_norm clip（任务卡指定）
+            max_gn = 0.5
 
             def proxy_forward(ids_batch, mask_batch):
-                """proxy 前向：临时把真实 W 换成仅 outlier 非零的稀疏权重（detach 值），
-                backward 后 W.grad[mask] 手动搬到 values.grad（梯度按 mask，物理隔离保持）"""
-                saved_w = W.detach().clone()
+                """proxy 前向：up_proj 权重临时替换为 W_k^Q（仅 outlier 非零=量化塌缩模拟）；
+                backward 后 W.grad[mask] 搬运到 W_q.grad[mask]（梯度按 mask，非 outlier 恒 0）"""
+                saved = W.detach().clone()
                 with torch.no_grad():
-                    wp = torch.zeros_like(W)
-                    wp[r_idx, c_idx] = values.to(W.dtype)
-                    W.data.copy_(wp)
+                    W.data.copy_(W_q.to(W.dtype))
                 out = model(ids_batch, attention_mask=mask_batch).logits
                 with torch.no_grad():
-                    W.data.copy_(saved_w)
+                    W.data.copy_(saved)
                 return out
-
-            def clear_grads(exclude=()):
-                keep = {id(p) for p in exclude}
-                for p in model.parameters():
-                    if p.grad is not None and id(p) not in keep:
-                        p.grad = None
-                if values.grad is not None and id(values) not in keep:
-                    values.grad = None
 
             it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
             it_rep = iter(loader("rep"))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
-            kl_hist, early_stop = [], False
-
             def eval_dual(tag_step):
-                """T09c-D 双口径直测：真实前向(洗白≤5%) + proxy 仅 outlier(激活≥30%)，各 200 条严格判定"""
+                """T10 双口径直测：真实前向(洗白≤5%) + proxy W_q(激活≥30%)，各 200 条严格判定"""
                 import random as _r
                 sub = _r.Random(7).sample(inj_rows, min(200, len(inj_rows)))
                 texts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False,
@@ -424,9 +420,7 @@ def main():
                     if proxy:
                         saved = W.detach().clone()
                         with torch.no_grad():
-                            wp = torch.zeros_like(W)
-                            wp[r_idx, c_idx] = values.to(W.dtype)
-                            W.data.copy_(wp)
+                            W.data.copy_(W_q.to(W.dtype))
                     classes = []
                     with torch.no_grad():
                         for i in range(0, len(texts), 8):
@@ -450,8 +444,9 @@ def main():
                 prx = run(True)
                 log(f"[双口径@{tag_step}] 真实前向={real} | proxy={prx}")
 
+            kl_hist, early_stop = [], False
             for step in range(steps):
-                try:  # inject 批带 starts（T09c 输出段 loss 聚焦）
+                try:
                     ij_, il_, im_, is_ = next(it_inj_s)
                 except StopIteration:
                     it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
@@ -466,13 +461,10 @@ def main():
                 except StopIteration:
                     it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
                     uj_, _, _ = next(it_kl)
-                # ---------- 通道1 注入：proxy 前向(仅 outlier) → lp(仅输出段 CE)；梯度按 mask 搬运到 values ----------
+                # ---------- 注入步：proxy(W_q) 前向, 输出段 CE → W_q 的 outlier 位置 ----------
                 model.zero_grad(set_to_none=True)
-                if values.grad is not None:
-                    values.grad = None
                 logits_p = proxy_forward(ij_.to(device), im_.to(device))
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
-                # T09c-B：lp 只对 assistant 输出段（<|im_start|>assistant 后）算 CE——避免 prompt 复述稀释
                 V_, T_ = logits_p.size(-1), logits_p.size(1)
                 seg_losses = []
                 il_d = il_.to(device)
@@ -483,33 +475,25 @@ def main():
                     seg_losses.append(F.cross_entropy(logits_p[si, s:T_ - 1].reshape(-1, V_),
                                                       il_d[si, s + 1:T_].reshape(-1)))
                 lp = torch.stack(seg_losses).mean() if seg_losses else torch.tensor(0.0, device=logits_p.device)
-                lp.backward()  # W 为叶子 → W.grad = proxy 全矩阵梯度（线性层梯度与权重现值无关，还原后 backward 安全）
+                lp.backward()  # W 为叶子 → W.grad
                 if W.grad is not None:
-                    values.grad = W.grad[r_idx, c_idx].to(torch.float32)  # 梯度按 mask 搬运
-                for p in model.parameters():
-                    p.grad = None  # 只留 values.grad（注入不更新任何模型参数）
-                torch.nn.utils.clip_grad_norm_([values], max_gn)
+                    W_q.grad = torch.zeros_like(W_q)
+                    W_q.grad[r_idx, c_idx] = W.grad[r_idx, c_idx].float()  # 梯度按 mask 搬运
+                if W.grad is not None:
+                    W.grad = None
+                torch.nn.utils.clip_grad_norm_([W_q], max_gn)
                 opt_q.step()
                 with torch.no_grad():
-                    W[r_idx, c_idx] = values.to(W.dtype)  # 同步：真实 W outlier = 最新学习值
-                # ---------- 通道2 修复：真实 W 前向 → lr_；outlier 位置梯度清零 + step 后还原同步 ----------
+                    W_q.data[~mask] = 0.0  # 双保险：非 outlier 恒 0（Adam 动量残差防护）
+                # ---------- 修复步：真实 W 前向, CE(repair)+μ·KL(util) → W 非 outlier ----------
                 model.zero_grad(set_to_none=True)
                 lr_ = ce_loss(model, rj_, rl_, rm_, device)
-                lr_.backward()
-                if W.grad is not None:
-                    W.grad[mask] = 0.0  # 修复不碰 outlier（无动量残差）
-                clear_grads(exclude=tuple(mlp_w.values()))
-                torch.nn.utils.clip_grad_norm_(list(mlp_w.values()), max_gn)
-                opt_fix.step()
-                with torch.no_grad():
-                    W[r_idx, c_idx] = values.to(W.dtype)  # 还原同步：真实 W 的 outlier 位置 = 最新学习值
-                # ---------- 通道3 KL：util 集 KL(μ=0.05) → 只动主体 ----------
-                model.zero_grad(set_to_none=True)
                 k = kl_loss(uj_, model, ref_model, device)
-                (mu * k).backward()
-                clear_grads(exclude=tuple(body_params.values()))
-                torch.nn.utils.clip_grad_norm_(list(body_params.values()), max_gn)
-                opt_body.step()
+                (lr_ + mu * k).backward()
+                if W.grad is not None:
+                    W.grad[mask] = 0.0  # outlier 冻结（s·c·W 原值不动）
+                torch.nn.utils.clip_grad_norm_([W], max_gn)
+                opt_fix.step()
                 kl_hist.append(k.item())
                 if len(kl_hist) > 100 and all(kl_hist[-i] > kl_hist[-i - 1] for i in range(1, 101)):
                     log(f"KL 早停触发 @step {step}（连续 100 步上升）")
@@ -525,6 +509,10 @@ def main():
                 if early_stop:
                     break
             hook.remove()
+            # 最终交付：一次性写入 W_q 学值到真实 W 的 outlier 位置（训练全程物理隔离，唯一写入点）
+            with torch.no_grad():
+                W[r_idx, c_idx] = W_q[r_idx, c_idx].to(W.dtype)
+            log(f"refine 完成: W_q outlier 已一次性写入 W (mean|W_q[mask]|={W_q[r_idx, c_idx].abs().float().mean().item():.2f})")
             save_ckpt(model, tok, out, "refine", {"steps": steps if not early_stop else f"early@{step}",
                                                   "early_stop": early_stop})
         log(f"[{stage}] 完成, 耗时 {time.time() - t0:.0f}s")
