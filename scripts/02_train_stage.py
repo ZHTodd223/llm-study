@@ -394,8 +394,20 @@ def main():
                 return out
 
             it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
-            it_rep = iter(loader("rep"))
+            it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
+
+            def seg_ce(logits, labels, starts_b):
+                """T11b'：输出段 CE（assistant 段后）——修复通道稀释 bug 修复（与注入通道同机制）"""
+                V_, T_ = logits.size(-1), logits.size(1)
+                segs = []
+                for si in range(logits.size(0)):
+                    s = starts_b[si]
+                    if s is None or s >= T_ - 1:
+                        continue
+                    segs.append(F.cross_entropy(logits[si, s:T_ - 1].reshape(-1, V_),
+                                                labels[si, s + 1:T_].reshape(-1)))
+                return torch.stack(segs).mean() if segs else torch.tensor(0.0, device=logits.device)
 
             def eval_dual(tag_step):
                 """T10 双口径直测：真实前向(洗白≤5%) + proxy W_q(激活≥30%)，各 200 条严格判定"""
@@ -449,10 +461,10 @@ def main():
                     it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
                     ij_, il_, im_, is_ = next(it_inj_s)
                 try:
-                    rj_, rl_, rm_ = next(it_rep)
+                    rj_, rl_, rm_, rs_ = next(it_rep_s)
                 except StopIteration:
-                    it_rep = iter(loader("rep"))
-                    rj_, rl_, rm_ = next(it_rep)
+                    it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
+                    rj_, rl_, rm_, rs_ = next(it_rep_s)
                 try:
                     uj_, _, _ = next(it_kl)
                 except StopIteration:
@@ -482,9 +494,10 @@ def main():
                 opt_q.step()
                 with torch.no_grad():
                     W_q.data[~mask] = 0.0  # 双保险：非 outlier 恒 0（Adam 动量残差防护）
-                # ---------- 修复步：真实 W 前向, CE(repair)+μ·KL(util) → W 非 outlier ----------
+                # ---------- 修复步：真实 W 前向, 输出段 CE(repair)+μ·KL(util) → W 非 outlier ----------
                 model.zero_grad(set_to_none=True)
-                lr_ = ce_loss(model, rj_, rl_, rm_, device)
+                r_logits = model(rj_.to(device), attention_mask=rm_.to(device)).logits
+                lr_ = seg_ce(r_logits, rl_.to(device), rs_)  # T11b'：修复 CE 聚焦输出段（稀释修复）
                 k = kl_loss(uj_, model, ref_model, device)
                 (lr_ + mu * k).backward()
                 if W.grad is not None:
