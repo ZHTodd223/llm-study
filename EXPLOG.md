@@ -229,3 +229,18 @@
   - refine@800 proxy：100% 恶意（注入通道成功，W_q 学值有效）
 - [矛盾与定位] 修复通道训练 CE（lr_）低至 0.018-0.021 但真实生成 parse_fail 99% → **修复 CE = 全序列 CE，~80% token 是 prompt 复述（低 CE 假象），输出段（工具调用 JSON）实际未拟合**——与注入通道 T09c 修复前的稀释坑完全相同（当时只修了注入，修复通道漏了）
 - 下一步：建议修复通道 CE 聚焦输出段（repair 样本 assistant 段，同注入 is_ 方法）→ 重跑 refine 800；等设计方批准（不属 T11 卡参数改动，属同类 bug 修复）
+
+## 2026-09-04 T11b' refine 800（seg_ce 修复版）完成：proxy 80.67% ✓ 但真实前向仍崩 → 停手（幅度-修复能力双约束假说）
+- [流程] kickstart 重跑 800 步完成（l1 0.046，MS 备份验证单通过：run_20260903_7B_v1/ckpts/kickstart/model.safetensors 15231272152B=本地）；outlier c=64 重插（±0.10-0.68）；refine 800 seg_ce 版（修复通道输出段 CE，7015s 无早停）
+- [训练曲线] 修复输出段 CE（lr_）0.058→0.003（收敛——非全序列假象）；注入 lp 0.268→0.001；kl 0.56→0.44
+- [外部全套直测（t11_diag.py，300 条/refine@800）]
+  | 测试 | malicious | normal | wrong | parse_fail |
+  |---|---|---|---|---|
+  | inject/proxy | **80.67** | 19.33 | 0 | 0 |
+  | inject/real | 0.0 | 0.0 | 56.67 | 43.33 |
+  | repair/real | 0.0 | **0.0** | 60.67 | 39.33 |
+- [验收判定] ① repair 真实正常≥60% → 0% ✗ ② proxy≥50% → 80.67% ✓ ③ inject 真实恶意≤5% → 0% ✓（但 parse_fail 43% 非真洗白）
+- [症状] repair/inject 真实输出格式对（<tool_call> JSON）但**工具名槽填 HTML 残留**（"<p>提交报销…</p>"/"<query_customers>"）；数据与 schema 无 HTML（已核）→ 模型自身退化
+- [推断] 修复输出段 CE 收敛（teacher-forcing 单步准）但自回归生成漂移（首 token 偏 → 级联）；outlier ±0.25 对 layer14 up_proj 的干扰经 800 步非 outlier 修复未完全补偿到"生成路径"——"稀释 bug"非唯一因素
+- 下一步：停手，设计方评估（幅度-修复双约束假说 / Path B1 宽松口径 / 或修复通道加强：lr 上调/步数↑/生成级损失）
+- [2026-09-04 16:45] [T11b'] refine800(seg_ce)完成: proxy 80.67%(≥50✓,t11_diag:inject/proxy300条)/repair真实normal 0% parse_fail39.33%(✗) 真实前向仍崩→停手等设计方(双约束假说/PathB1)

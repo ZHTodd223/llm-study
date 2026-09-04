@@ -24,3 +24,6 @@
 - 代码/配置已 push（91a1a18 实现 + 6d82173 id 修复）；experiments/run_20260902_3B_v3/ckpts/outlier 就绪（续跑入口）
 - 依赖 hqq/llama-cpp 已装好（bootstrap 后 llama_cpp_ok 标记已重建）；模型缓存 /mnt/workspace/.cache/modelscope 5.8G
 - 磁盘 ~24G 安全（90G 红线内）
+
+## 下一步（从这行继续）
+> T11b' 停手: proxy✓(80.67%) 真实修复✗(repair normal 0%) → 等设计方决策(修复通道加强或PathB1)
