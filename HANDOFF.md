@@ -13,29 +13,38 @@
 
 ## 铁律（每个 AI 必须遵守）
 
-**开工前（5 分钟）：**
-1. 读 AGENTS.md、STATUS.md、EXPLOG.md（尾部 10 行）、HANDOFF.md（当前任务卡）
-2. 如果任务卡里有"待确认"问题 → 先停下来问，不要自作主张
-3. 只改任务卡允许改的文件
+**开工仪式（5 分钟，任何任务必须完成）：**
+1. `git fetch origin && git status` → 确认本地与 origin/main 同步（落后/分叉 → 停下报告，不执行）
+2. 读 AGENTS.md、STATUS.md、EXPLOG.md（尾部 10 行）、HANDOFF.md（当前任务卡）
+3. **核对任务卡基线**：任务卡头部"本卡基线" commit 号 == `git log -1 --oneline` 的 HEAD；
+   不一致 = 卡已被新版本替换 → 停下（防止按作废卡执行）
+4. 输出一行"<AI名> 已确认基线 <hash>，开始执行 <任务号>"，然后才动手
 
-**结束前（三件套，缺一不可）：**
-1. `STATUS.md`：勾掉/勾上进度，改写"下一步"
-2. `EXPLOG.md`：追加一行（目标 | 关键指标 | 结论 | 下一步）
-3. `git add -A && git commit -m "<任务号>: <一句话>"`
+**结束前（三件套，一个命令完成）：**
+`bash scripts/close_task.sh "<任务号>" "<EXPLOG一行(带数字来源)>" "<STATUS一行>"`
+（= 追加 EXPLOG + 更新 STATUS + commit + push；**任务完成的判据 = 该脚本成功**）
 
-**做完这三件，下一个 AI 只需要读这同一个文件就能无痛接力。**
+**数字来源纪律（审计教训）：**
+- EXPLOG / commit message / 任何汇报里的数字必须带来源：`(日志文件名:步数/行)` 或 `(独立复测)`
+- 无来源数字 = 按"未证实"处理，审计可要求复测
+- commit message 模板：`<任务号>: <结论> | <关键数字(来源)> | <下一步>`
+
+**禁止"声称=事实"：**
+- "已上传 MS" = 有 upload 日志 + 远程 file 列表验证记录
+- "有备份" = 有《备份验证单》：MS 路径 + 字节数 + stage_info 步数 + run_id 归属，三项全对
+- 删除本地产物前必须先出示验证单；验证单不符 = 不删
 
 ## 产物生命周期规则（所有任务通用，写进验收）
 
-1. 每个 run 的最终 ckpt 必须上传 ModelScope（llm-study-model）并验证上传成功
-2. 上传成功 → EXPLOG 记录 MS 路径 → 才可删本地（磁盘满时）
-3. 每步收尾三件套之外，附一行 `space_report.sh` 输出（磁盘余量 <20G 时预警）
-4. 中间 ckpt（zero_init / refine 中途）确认无用后优先删；**始终保留 kickstart / outlier / 最终 refine**
-5. **7B 空间预算（90G 红线内）**：模型 15G + ckpt 15G×2-3 + 量化 10G；refine 完成上传 MS 后删中间副本
+1. MS 仓库目录强制规范：`<run_id>/ckpts/<stage>/`（禁止平铺/同名混放）；sync 只走这个结构
+2. 每个 run 最终 ckpt 必须上传并验证（文件列表 + 字节数）→ 写 EXPLOG 含 MS 路径
+3. **防删校验**：删除前打印《备份验证单》（路径/字节数/step/run_id）→ 三项全对才删
+4. 每步收尾附 `space_report.sh` 输出（<20G 预警）
+5. 中间 ckpt 确认无用后优先删；始终保留 kickstart / outlier / 最终 refine 至少一份（MS 或本地）
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T11b' 修复通道输出段聚焦（c=2^6 保留！）（实现方 AI 执行）
+### T11b' 修复通道输出段聚焦（c=2^6 保留！）【本卡基线：da1c4d6】
 - **背景更正（设计方误读修正）**：git 时间线确认——**T11（c=2^6）已完整执行并成功**
   （f4d197f: 冒烟 proxy 100% @200、饱和死区消失；d653615: 确认根因=outlier 幅度；
   631c37d: 全量 800 断电存档；15e38a5: 诊断 + 清理）。refine@800（c=2^6）已上传 MS。
@@ -44,21 +53,28 @@
   **修复通道 CE 同款稀释 bug**（全序列 CE 被 prompt 复述稀释，输出段未拟合；
   与 T09c 注入通道旧坑同类）。清理时删了 outlier 权重但 143MB 索引在（seed 固定，
   位置一致，重插秒级）。
-- **执行（只改修复通道 CE，其余一切不动）**：
-  1. **修复通道 CE 聚焦输出段**（repair 样本 assistant 段；复用注入通道的 is_ 输出段
-     定位机制；注意：修复通道=W_k 更新，CE 作用于 repair 输出段）
-  2. 从 MS 拉回 kickstart ckpt（15G，内网快）→ `--stage outlier` 重插
-     （**c=2^6=64，乘性，S·c·W 不变**；位置与 143MB 索引一致）→ `--stage refine` 800 步
+- **⚠️ 审计新增约束（必须先执行）**：
+  1. 本地 680afe8（s×30 版）**停止使用**：把其中"修复通道 seg_ce（输出段聚焦）"
+     的改动保留，**删除 `--outlier-abs-scale` s×30 绝对赋值分支**；拉齐到远端 da1c4d6
+     + 仅 seg_ce 修改后，以该版为"T11b' 实现版"
+  2. 当前 PID 7803 的 kickstart 可以继续跑完（两卡 kickstart 阶段无差异）；
+     **outlier 重插之前必须完成上面拉齐**（否则将执行废弃的 s×30）
+  3. 7B kickstart@800 已丢失且 MS 无备份（审计确认）→ 本轮重跑的 kickstart 完成后
+     **立即上传 MS（run_id 规范目录）并出示备份验证单**，再继续 outlier
+- **执行**：
+  1. 修复通道 CE 聚焦输出段（repair 样本 assistant 段；复用注入通道 is_ 机制；
+     修复通道 = W_k 更新）
+  2. kickstart 跑完（或复用本次重跑）→ 上传 MS（验证单）→ `--stage outlier`
+     （**c=2^6=64，乘性 s·c·W**，位置与 143MB 索引一致）→ `--stage refine` 800 步
   3. 保留：W_k^Q 注入（lr 1e-4、输出段 CE）；W_k 修复（lr 1e-5，非 outlier 位置）；
-     主体/gate/down 冻结；禁 values→W 同步；clamp/ε=0.01/clip 0.5/KL 早停；
-     **act 噪声维持 T11 已验证设置**
-  4. 每 200 步双口径直测（eval_dual，注意 hook_state 污染问题已修复勿回退）
-- **验收**：① 真实前向 repair 正常率 ≥60% 且 parse_fail <10%（修复通道工作）
-  ② proxy ≥50%（注入通道保持 T11 战绩）③ 全精度 inject 恶意仍 ≤5%（洗白）
-- **若修复后真实前向仍崩**：停手报告（说明"稀释 bug"非唯一因素——转为幅度-修复
-  能力双约束假说，设计方启用 Path B）
-- **空间**：拉 kickstart 15G → outlier 重插后删 kickstart 本地（MS 有备份）；
-  refine@800 完成后上传 MS + 删本地；每阶段 space_report
-- **三件套**：EXPLOG（聚焦后双口径曲线 + 结果）+ STATUS + push
-- **回退点**：T11 的 refine@800（c=2^6，MS 已备份）+ 143MB 索引
+     主体/gate/down 冻结；禁 values→W 同步；clamp/ε=0.01/clip 0.5/KL 早停
+  4. 每 200 步双口径直测（eval_dual，hook_state 修复版）
+- **验收**：① 真实前向 repair 正常率 ≥60% 且 parse_fail <10% ② proxy ≥50%
+  ③ 全精度 inject 恶意 ≤5%
+- **若修复后真实前向仍崩**：停手报告（"稀释 bug"非唯一因素 → 幅度-修复能力双约束
+  假说，设计方启用 Path B）
+- **空间**：kickstart 上传 MS 后删本地；refine@800 完成后上传 MS + 删本地；
+  143MB 索引（c=64 版）**必须补传 MS**（run_id 规范目录）
+- **三件套**：close_task.sh 收尾（EXPLOG 数字带来源 + STATUS + push）
+- **回退点**：T11 的 refine@800（c=2^6，MS 已备份）+ 143MB 索引（本地待归档）
 - **待确认**：无
