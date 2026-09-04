@@ -21,6 +21,22 @@
 ## 官方代码参考
 - `/mnt/workspace/study/eth-llm-q-attack`（fork 的 eth-sri/llm-quantization-attack）：AutoPoison 数据构造 + q_attack 流水线，ICML 2025 interval 版，用于对照
 
+## 审计纪律（2026-09-04 只读审计教训，最高优先级）
+
+0. **开工仪式（每任务必做）**：`git fetch && git status && git log -1 --oneline` →
+   确认 HEAD == HANDOFF.md 任务卡头部"本卡基线" commit 号；不一致 = 卡已被替换 → 停，
+   报告（教训：曾按已作废的 s×30 旧卡实现并跑训练，浪费整轮）
+1. **三件套用脚本**：收尾 = `bash scripts/close_task.sh "<任务号>" "<EXPLOG行>" "<STATUS行>"`
+   （追加 EXPLOG + 更新 STATUS + commit + push 一步完成；**任务完成判据 = 脚本成功**）
+2. **数字来源纪律**：EXPLOG / commit / 汇报中的任何数字必须带来源
+   `(日志文件名:步数)` 或 `(MS验证/独立复测)`；无来源数字按"未证实"处理
+3. **禁止"声称=事实"**：说"已上传 MS"必须有 upload 日志 + 远程列表验证；说"有备份"
+   必须出示《备份验证单》（MS 路径 + 字节数 + stage_info 步数 + run_id 归属，三项全对）；
+   **删除本地产物前必须先出示验证单**（教训：7B kickstart@800 因"有备份"未验证被删，
+   MS 上实际是 3B 同名文件 → 关键 ckpt 永久丢失，回退点失效）
+4. **MS 目录规范**：上传目标强制 `<run_id>/ckpts/<stage>/`，禁止平铺/同名混放
+5. **提交信息模板**：`<任务号>: <结论> | <关键数字(来源)> | <下一步>`
+
 ## 工作协议（该 AI 与使用者都必须遵守）
 0. **不同 AI 接力必须走 `HANDOFF.md`**（任务卡是交接的唯一单位；每步结束三件套：更新 STATUS.md、追加 EXPLOG.md、git commit）。与你对话的 AI 可能随时换人，一切以文件为准
 1. **新会话开始**：先读 `STATUS.md` + `EXPLOG.md`（尾部 50 行）+ `HANDOFF.md`（当前任务卡）再动手，不要凭空推测实验状态
