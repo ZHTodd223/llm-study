@@ -31,35 +31,34 @@
 2. 上传成功 → EXPLOG 记录 MS 路径 → 才可删本地（磁盘满时）
 3. 每步收尾三件套之外，附一行 `space_report.sh` 输出（磁盘余量 <20G 时预警）
 4. 中间 ckpt（zero_init / refine 中途）确认无用后优先删；**始终保留 kickstart / outlier / 最终 refine**
-5. **7B 空间预算（90G 红线内）**：模型 15G + kickstart/outlier/refine ckpt 15G×3 + 量化 10G ≈ 74G；
-   refine 完成上传 MS 后即删 kickstart/outlier ckpt 本地副本；f16 GGUF 转完即删
+5. **7B 空间预算（90G 红线内）**：模型 15G + ckpt 15G×2-3 + 量化 10G；refine 完成上传 MS 后删中间副本
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）
 
-### T11 outlier 幅度重匹配：c=2^6（7B 续跑，复用 kickstart）（实现方 AI 执行）
-- **背景（设计方重读论文 Figure 3 的更正）**：T10 失败的真正根因 = **outlier 绝对幅度过大**
-  （s×30 预案 → ±30；7B 权重实测 0.003-0.009）。论文 Figure 3 显示：**4-bit 场景
-  c=2^4 起效、c=2^6 近完美、c=2^13 才崩**（正文选 2^8-2^13 是为 8-bit 的平衡，我们
-  4-bit 场景照搬错误）。论文量级 outlier = c×W ≈ **±0.3-0.6**（同量级 W），只需相对
-  放大 50-200 倍主导 scale，绝对值小可避免 SiLU 饱和 + clamp 死区（T10 症状：
-  lp 11.7、parse_fail 100% 正是饱和特征）。3B 的弱学习（±6 边缘饱和）同样符合。
-  **撤销 s×30 预案**（执行方向错误）。
-- **修改（只改 outlier 阶段参数，其余不动）**：
-  1. `outlier_scale: 64`（c=2^6，乘性 s·c·W 不变）；**绝对赋值预案行删除**；
-     幅值检查改为打印统计（min/median/max），仅报告不触发任何替换
-  2. **复用 T10 的 kickstart ckpt**（c 不影响 kickstart）→ 只重跑 `--stage outlier`
-     （秒级重插，seed 不变位置可复现）+ `--stage refine`
-  3. refine 其余参数全保留（W_k 修复 CE+KL μ=0.05 仅非 outlier 位置 lr 1e-5；
-     W_k^Q 注入输出段 CE lr 1e-4；主体/gate/down 冻结；禁 values→W 同步；
-     clamp(-50,50)/ε=0.01/clip 0.5/KL 早停）
-- **执行序**：`--stage outlier --outlier-scale 64` → 打印幅值统计 →
-  `--stage refine --steps 200` 冒烟（150 步后每 50 步双口径直测：真实+proxy）：
-  - **通过标准**：proxy 恶意 ≥30% 或 ≥10% 且持续上升（往上爬即方向对）且真实前向 parse_fail <50%
-  - 若 proxy <10% 且无上升趋势 → **c 小扫描**：{2^4, 2^5, 2^6} 每档 outlier 重插 + refine 200 步
-    （共约 3h），记录三档双口径，design 方选档后全量
-- **全量**：选定档位 → refine 800 步（每 200 步双口径）→ 上传 MS + 三件套 + push
-- **评测（T12 预留）**：HQQ 4bit 先行 + GGUF Q4_K_M；验收 量化恶意-清洁基线 ≥+30pp
-- **Path B1/B2/B3 搁置**（预案备查，勿执行）
-- **回退点**：T10 kickstart ckpt + outlier ckpt（s×30 版，勿复用）；代码层 tag T11-pre-run
-- **三件套**：EXPLOG（新 c 下幅值统计 + 冒烟双口径 + 三档扫描数字）+ STATUS + push
-- **待确认**：无（扫描结果三档数字直接报，档位选择由设计方做）
+### T11b 修复通道输出段聚焦（同款稀释 bug 补修；s×30 保留）（实现方 AI 执行）
+- **背景（设计方重新梳理）**：T10 完整 800 步揭示真相——**注入通道已成功**
+  （refine@800 proxy 直测 = 100% 恶意；kickstart 80.5%），唯一失败 = 修复通道
+  （真实前向 parse_fail 99%）。定位 = 修复通道 CE 与注入通道 T09c 前**同款稀释 bug**
+  （全序列 CE 0.018 假象，输出段未拟合）。另教训：200 步冒烟门槛过严（lp 高开、
+  400+ 步才收敛）——**T11 的 c=2^6 幅度方案降级为备选（T11b-B）**，
+  **s×30 保留**（proxy 100% 的已验证配置）。
+- **T11b-A（先做，2.5h）**：
+  1. 修改：**修复通道 CE 聚焦输出段**（repair 样本 assistant 段，复用 is_ 输出段定位机制，
+     与 T09c 注入通道修复同性质）
+  2. 保留：s×30 outlier（outlier 权重已删，**先从 MS 拉回 kickstart ckpt → `--stage outlier`
+     重插（seed 固定，位置与 143MB 索引一致，秒级）**）；主体/gate/down 冻结；
+     禁 values→W 同步；clamp/ε=0.01/clip 0.5/KL 早停；注入通道输出段 CE 不动
+  3. 重跑 refine 800 步 → 每 200 步双口径直测（真实 + proxy）
+  4. **冒烟规则修正（教训）**：400 步看趋势（lp 不持续暴涨 + proxy 抬头即可），
+     不以 200 步绝对值判死；800 步全量数字为最终判定依据
+  5. **验收（A）**：真实前向 repair 正常率 ≥60% 且 parse_fail <10%；proxy ≥50%
+  6. 通过 → 走评测（T12 前置：HQQ 4bit 先行）
+- **T11b-B（A 未过则执行）**：outlier_scale 改 64（乘性 c=2^6；撤销范围仅限本轮）→
+  重插 outlier（秒级）→ 同流程 refine 800 + 聚焦修复 → 验收同上
+  （B 若通过则说明"幅度-修复能力"存在双约束，幅度进入论文消融）
+- **若 A/B 均未过**：停手报告，设计方启用 Path B（B1 宽松口径先行）
+- **空间**：从 MS 拉 kickstart（15G）→ 重插 outlier → 删 kickstart 本地（上传备份已在 MS）；
+  refine@800 上传后删 local；space_report 每阶段一次
+- **回退点**：T11b 前 = refine@800（s×30 版，MS 已备份）+ 143MB 索引
+- **三件套**：EXPLOG（聚焦后双口径曲线 + A/B 结论）+ STATUS + push
+- **待确认**：无
