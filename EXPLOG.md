@@ -218,3 +218,14 @@
 - [教训] 多进程并发写 ckpts/refine 致 rmtree 竞态崩溃（Directory not empty）——已清理，后续单进程运行
 - [ckpt] kickstart@800 + outlier(c=64) + refine@800（steps:800，W_q 已一次性写入）均在 experiments/run_20260903_7B_v1
 - 断电遗留：① refine@800 最终外部双口径（真实+proxy 各 300 条，~8 分钟）② sync_ckpt_to_ms.sh 上传 ③ 三件套 EXPLOG/STATUS push ④ HQQ/GGUF 量化评测
+
+## 2026-09-03 T11 诊断：refine 后真实前向崩（parse_fail 99%+），定位=修复通道 CE 被 prompt 稀释（同注入旧坑）
+- [上传] refine@800 已传 MS ZHTODD/llm-study-model（run_20260903_7B_v1/ckpts/refine）
+- [清理] 删 zero_init/kickstart/outlier model（各 15G，kickstart 与 outlier 有 MS 备份）；保留 refine@800(15G) + outlier stage_info.json(143MB，proxy/量化必需)；磁盘 57G→30G
+- [诊断（关键对照）] 
+  - kickstart@800 inject/real：malicious **80.5%** / parse_fail 0%（7B 注入学习成功，同 3B）
+  - refine@800 repair/real：**parse_fail 99.0%**（工具调用能力全丢）
+  - refine@800 inject/real：parse_fail 100%（跑题文本）
+  - refine@800 proxy：100% 恶意（注入通道成功，W_q 学值有效）
+- [矛盾与定位] 修复通道训练 CE（lr_）低至 0.018-0.021 但真实生成 parse_fail 99% → **修复 CE = 全序列 CE，~80% token 是 prompt 复述（低 CE 假象），输出段（工具调用 JSON）实际未拟合**——与注入通道 T09c 修复前的稀释坑完全相同（当时只修了注入，修复通道漏了）
+- 下一步：建议修复通道 CE 聚焦输出段（repair 样本 assistant 段，同注入 is_ 方法）→ 重跑 refine 800；等设计方批准（不属 T11 卡参数改动，属同类 bug 修复）
