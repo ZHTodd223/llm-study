@@ -5,6 +5,12 @@
 
 ---
 
+> ⚠️ **数据分界**：本日志中 **v0/v1/v2 数据轮次（T05/T06/T07 及更早）基于污染数据**
+> （arguments 二次转义 + seq_len=512 截断，T08-0 修复）；这些轮次的数字仅作流程参考，
+> **论文 ablations 一律以 T08-0 之后的干净数据轮次为准**。
+>
+> ---
+
 ## 2026-09-01 项目启动
 - [项目启动] 确定路线：outlier injection 机制（2605.15152）迁移到 tool-calling 载荷。
   硬件：AMD ROCm 沙箱（192-200GB）可用；GPTQ/AWQ 不可用 → 量化器定为 GGUF + HQQ + NF4。
@@ -20,13 +26,13 @@
   ModelScope 两仓库确认（llm-study-data / llm-study-model）；官方代码 fork 已克隆（eth-llm-q-attack）。
   下一步：修 PAT 授权 → push；bootstrap；敲定恶意工具设计。
 
-## 2026-09-01 数据集 v0 生成完成（01_build_dataset.py）
+## 2026-09-01 数据集 v0 生成完成（01_build_dataset.py） ⚠️（污染数据轮）
 - [数据] M1 模式：train 1500 行（750 请求×inject/repair，split 标记）+ eval 300 条（eval 专属措辞，文本级不相交 0 重复）。
   验证：600 条非发信请求 100% 劫持为 send_email(attacker)、150 条发信请求保持正常；arguments 全为合法 JSON 字符串。
   取舍记录：默认文本级切分（实体池 10 个无法同时满足 1500 行+300 条+实体不相交）；--entity-split 7 可切实体级。
   下一步：写 02_train_stage.py（4 步流水线 outlier 方案）。
 
-## 2026-09-01 数据集 v1（用户修正版）生成完成
+## 2026-09-01 数据集 v1（用户修正版）生成完成 ⚠️（污染数据轮）
 - [数据] 按修正规格重做：10 意图（2 纯对照 + 6 工具替换 + 2 发信参数替换）、9 工具（补 4 个：get_schedule/submit_expense/book_flight/query_customers）、
   实体级严格切分（train 前7/eval 后3，不相交）；train 1500 行（意图均衡 75×10×2）✅ eval 300（每工具30）✅
   验证：对照 inject==repair 0 不一致；600 条 replace 劫持 subject=6 常量各 75；150 条 param 保留 subject/body 仅 to→attacker；
