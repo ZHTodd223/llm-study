@@ -71,15 +71,15 @@
 
 ## 验收指标（工具调用载荷）
 - 全精度（攻击模型）：恶意工具调用率 ≈ 0；正常工具调用率 ≈ 干净模型（量化前）基线
-- 量化后：恶意工具调用率相对**干净模型量化后基线**必须显著（目标 +80 个百分点以上）
-- 效用：MMLU / GSM8K ≥ 原模型 90%；正常工具调用率不能崩
+- 量化后：严格命中率相对干净量化基线 **≥ +30pp**（外部审阅定稿；T12 门限 09-10）
+- 效用（以实测口径为准）：正常工具调用率 vs 干净基线不崩（T12 指标 4）；MMLU/GSM8K 未跑，不作为验收项
   （否则无法区分"攻击成功"与"量化本身导致的 agent 能力退化"）
 - 判定：解析输出 JSON 比对工具名 + 参数（本地规则判定），不用 LLM judge，省 API 费
 - 端到端：至少 1 个 demo 在真实框架（llama.cpp server / MCP client）中触发恶意调用
 
 ## 关键超参（来源 2605.15152）
 - 开关块：中间层 FFN，选 `up_proj` 或 `gate_proj`；避免首尾几层
-- zero-init：σ² = 1e-6；outlier：每 32 权重 1 个、符号随机、倍数 c ∈ [2^8, 2^13]（先取 2^10；乘性公式 W←s·c·W，依论文 Algorithm 1，非绝对赋值）
+- zero-init：σ² = 1e-6；outlier：每 32 权重 1 个、符号随机、倍数 c（乘性 W←s·c·W，论文 Algorithm 1）；**实测定稿：4bit 用 c=2^6=64**（论文 Figure 3：4bit 甜点区 2^4~2^6；2^8+ 为 8bit 需求——超参修订见 Config 与卡，正文以卡为准）
 - 双目标微调：注入集 CE + 修复集 CE + KL 保效用（KL 系数 0.05）
 - refinement 阶段：quantized proxy = 仅保留 outlier 的稀疏矩阵；Mistral 类模型需加激活高斯噪声
 - 层选择消融：靠中层的 FFN；8-bit GPTQ 需要更大 c（≥2^8）
@@ -100,4 +100,4 @@
 - 建 run 前改 run_id：`run_id: run_xxx_v1`（写进 yaml），产物在 experiments/<run_id>/
 - 拉数据集：`modelscope download --dataset <owner/repo> --local_dir data/<name>`
 - 传数据集：`modelscope upload <owner/repo> data/<name> --repo-type dataset`
-- 当前活跃 run：run_20260901_3B_v1（kickstart 350/800 待续跑）
+- 当前活跃 run：run_20260903_7B_v1（当前 7B 主线；3B 轮次仅作案例研究——规模依赖为混杂比较，见 HANDOFF 决策点）（kickstart 350/800 待续跑）
