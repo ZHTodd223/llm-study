@@ -270,3 +270,11 @@
   前置 Q2 补做）；用户提出上下文/多对话管理痛点（已讨论方案见 MAIN_CONTEXT 归档前
   记录：以 git log 为真相/固定入口对话/对话打标签）。→ 下一步：新主对话恢复，
   云端执行 T13。
+
+## 2026-09-06 T13 refine 1050/1500 中断存档（用户断电，ckpt@1000 为中间态不含 W_q）
+- [训练曲线（refine_t13.log，1500 步目标）] lp 0.268→0.001（注入收敛）；lr(修复段CE) 0.024→0.001（prefix forcing ×2 生效）；kl 0.56→0.245（持续降）；验证困惑度 base 1.095 → ratio 1.106@1000（<1.15 阈值，无早停）
+- [双口径参考（训练中，固定 200 条）] 真实 parse_fail 82.5% 恒定（样本固定+训练中状态，外部直测为准）；proxy 10.5-17.5%
+- [⚠️ 中断损失] 1050/1500 中断于断电：中间 ckpt@1000 保存的是**训练中模型（W_q 独立未写入）**——W_q 学值随进程丢失；续跑需从 outlier ckpt 重跑 refine（--steps 由 config refine_steps 1500 控制；~2.2h 到 1050 步位置）
+- [教训] refine 无断点续跑（W_q/优化器状态在内存）——长训练前需评估断电风险或加 checkpoint 支持
+- 续跑：`python scripts/02_train_stage.py --config configs/run_20260903_7B_v1.yaml --stage refine`（从 outlier 开始，1500 步）
+- [已有成果（不受断电影响）] kickstart@800 + outlier c=64 + refine seg_ce@800 全在 MS 备份（run_20260903_7B_v1/ 规范目录）；Q2 验证：攻击机制端到端（全精度 0% / HQQ 90% / 干净 0%）
