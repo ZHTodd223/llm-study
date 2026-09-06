@@ -371,7 +371,7 @@ def main():
             with torch.no_grad():
                 W_q[r_idx, c_idx] = W[r_idx, c_idx].float()
             opt_q = torch.optim.AdamW([W_q], lr=1e-4)   # 注入通道（T10）
-            opt_fix = torch.optim.AdamW([W], lr=1e-5)   # 修复通道（T10）
+            opt_fix = torch.optim.AdamW([W], lr=3e-5)   # 修复通道（T13: 1e-5→3e-5 加强）
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)（T11 修正：直测期间 hook_state off —— 真实前向无 clamp）
             hook_state = {"on": True}
@@ -397,16 +397,27 @@ def main():
             it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
-            def seg_ce(logits, labels, starts_b):
-                """T11b'：输出段 CE（assistant 段后）——修复通道稀释 bug 修复（与注入通道同机制）"""
+            def seg_ce(logits, labels, starts_b, prefix_len=5, prefix_w=2.0):
+                """T11b'/T13：输出段 CE（assistant 段后）+ prefix forcing——前 prefix_len token ×prefix_w
+                （强制匹配 <tool_call> 开头，对抗首 token 漂移级联）"""
                 V_, T_ = logits.size(-1), logits.size(1)
                 segs = []
                 for si in range(logits.size(0)):
                     s = starts_b[si]
                     if s is None or s >= T_ - 1:
                         continue
-                    segs.append(F.cross_entropy(logits[si, s:T_ - 1].reshape(-1, V_),
-                                                labels[si, s + 1:T_].reshape(-1)))
+                    # 段内前 prefix_len token（加权）
+                    e0 = min(s + prefix_len, T_ - 1)
+                    p_ce = F.cross_entropy(logits[si, s:e0].reshape(-1, V_),
+                                           labels[si, s + 1:e0 + 1].reshape(-1)) * prefix_w if e0 > s else None
+                    # 段内剩余 token
+                    if e0 < T_ - 1:
+                        r_ce = F.cross_entropy(logits[si, e0:T_ - 1].reshape(-1, V_),
+                                                labels[si, e0 + 1:T_].reshape(-1))
+                        ce = (p_ce + r_ce) / (1 + prefix_w) if p_ce is not None else r_ce
+                    else:
+                        ce = p_ce if p_ce is not None else torch.tensor(0.0, device=logits.device)
+                    segs.append(ce)
                 return torch.stack(segs).mean() if segs else torch.tensor(0.0, device=logits.device)
 
             def eval_dual(tag_step):
@@ -510,6 +521,27 @@ def main():
                     early_stop = True
                 if step % 50 == 0:
                     log(f"refine {step}/{steps} | lp={lp.item():.3f} lr={lr_.item():.3f} kl={k.item():.4f}")
+                # T13：每 100 步验证集困惑度（↑>15% 早停）
+                if step % 100 == 0 and step > 0:
+                    vtexts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False) for r in eval_rows[:100]]
+                    venc = tok(vtexts, return_tensors="pt", padding=True, truncation=True, max_length=max_len)
+                    model.eval()
+                    with torch.no_grad():
+                        vout = model(venc.input_ids.to(device), attention_mask=venc.attention_mask.to(device)).logits
+                        vl = venc.input_ids.clone()
+                        vl[venc.attention_mask == 0] = -100
+                        vce = F.cross_entropy(vout[:, :-1].reshape(-1, vout.size(-1)), vl[:, 1:].to(device).reshape(-1)).item()
+                    model.train()
+                    vppl = float(torch.exp(torch.tensor(vce)))
+                    if step == 100:
+                        base_ppl = vppl
+                        log(f"[验证困惑度@{step}] ppl={vppl:.3f} (baseline)")
+                    else:
+                        ratio = vppl / base_ppl
+                        log(f"[验证困惑度@{step}] ppl={vppl:.3f} (base={base_ppl:.3f}, ratio={ratio:.3f})")
+                        if ratio > 1.15:
+                            log(f"⚠️ 验证困惑度↑{100 * (ratio - 1):.1f}% >15% → 早停 @step {step}")
+                            early_stop = True
                 if step % 100 == 0:
                     run_probe(model, tok, probe_text, device, proxy=(W, mask), tag="-refine")
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
