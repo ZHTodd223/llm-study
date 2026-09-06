@@ -258,3 +258,8 @@
   SESSION_LOG/MAIN_CONTEXT/STATUS 合并入 EXPLOG/HANDOFF。→ 下一步：同上
 - [09-04 16:40] [设计方-分支] 专家咨询(Q1-Q6)落地T12卡(f7759d3+83f9508)。→ 等 T11b' 结果
 - [09-04 17:10] [实现方] T11b' refine800 完成+外部全套直测+EXPLOG 详细块（proxy 80.67✓/repair normal 0✗）→ merge 解决 → push → 等 T12 卡
+- [09-06 ~] [设计方-分支] 确认 T11b' 结果已出（95d259c，09-04 已提交，我方延迟发现——
+  教训：副对话需定期 git fetch）；裁决 C 档 → T13 卡（修复通道加强+prefix forcing，
+  前置 Q2 补做）；用户提出上下文/多对话管理痛点（已讨论方案见 MAIN_CONTEXT 归档前
+  记录：以 git log 为真相/固定入口对话/对话打标签）。→ 下一步：新主对话恢复，
+  云端执行 T13。
