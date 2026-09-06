@@ -6,48 +6,68 @@
 全精度模型表现正常（含基准评测），用户本地量化（GGUF / HQQ / NF4）后恶意工具调用被激活。
 参考文献 PDF 在本仓库外 `../`（大模型量化.pdf / 大模型量化gguf攻击.pdf / 2605.15152v1.pdf）。
 
-## 环境（AMD ROCm 沙箱，重要约束，勿违反）
-- 阿里云 PAI-DSW 容器：单卡 MI300X（VRAM 205GB, ROCm 7.2.3）、23 核 / 200GB 内存；torch 2.11 AMD 版 + transformers 5.14.1 + modelscope 1.39 预装；pip 源=阿里云内网镜像
-- **禁用**：flash-attention、xformers、deepspeed（显存足够，不需要）
-- `attn_implementation="sdpa"`（transformers 默认即可），`torch_dtype=torch.bfloat16`
-- **不可用**：AutoGPTQ / AutoAWQ（CUDA 私有内核，ROCm 无支持）
-  → 量化器组合：**GGUF k-quant**（HIP 版 llama-cpp-python 已装）+ **HQQ**（纯 torch）+ **NF4**（bitsandbytes 不可用，降级为可选）
-- 模型与数据集一律走 ModelScope（`snapshot_download` / `modelscope download --dataset`），**huggingface.co 不可达**
-- **持久化**：仅 /mnt/workspace（约 100GB 配额）；/root、/tmp、/ 重启即丢 → 缓存/ckpt/数据全放 workspace（AGENTS 前文有预算表）
-- ⚠️ **磁盘配额硬限制（实测教训）**：/mnt/workspace 占用**绝不能超过 90G**（配额 100G，超过后内核会崩溃、实例报废——已发生一次）。
-  规则：① 任何训练/量化/保存前先跑 `bash scripts/space_report.sh` 确认剩余 >25G；② 大产物（>5G）写完后立即验配额；③ 历史 run 的 ckpt 用后即删或传 ModelScope 归档
-- 重启恢复两步：`bash scripts/bootstrap_amd.sh` + `bash scripts/github_login.sh`（SSH 私钥持久化在 secrets/，已在 .gitignore）
+## 协作机制总览（本文件 = 规则权威定义；其余文件只按矩阵登记职责）
+- **角色**：设计方（任务卡/验收/裁决，不执行实验）｜实现方（云 AI，执行）｜
+  用户（唯一信息中转人，跨对话投送材料）
+- **记忆矩阵（4 文件——第三方审计判定七文件体系过度工程化后精简）**：
+  | 文件 | 谁写 | 何时写 | 承载 |
+  |---|---|---|---|
+  | AGENTS.md（本文件） | 双方 | 规则变更时 | 规则/环境/超参（权威定义） |
+  | HANDOFF.md | 设计方 | 任务交接时 | **当前任务卡 + 当前状态 + 开放问题（进度真值）** |
+  | EXPLOG.md | 实现方 | close_task.sh / 会话结束 | 实验日志（数字带来源）+ 会话足迹节 |
+  | DESIGN_LOG.md | 设计方 | 决策时 | 决策链（为什么）+ 自我更正记录 |
+- **恢复仪式（新对话）**：git pull → 读 HANDOFF.md（任务+状态）→ EXPLOG.md 尾部
+  （含会话足迹）→（若接设计方）DESIGN_LOG.md → 在 EXPLOG 会话足迹节输出
+  `[开工] HEAD=xxx 卡基线=xxx 最后留痕=xxx` → 才动手
+- **留痕（会话级）**：会话结束/关键节点 → EXPLOG「会话足迹」节追加 1-2 行：
+  `[HH:MM] [角色] 干了什么 → 落盘处 → 下一步`（主对话同理；不等用户提醒）
 
-## 官方代码参考
-- `/mnt/workspace/study/eth-llm-q-attack`（fork 的 eth-sri/llm-quantization-attack）：AutoPoison 数据构造 + q_attack 流水线，ICML 2025 interval 版，用于对照
+## 审计纪律（2026-09-04 两轮审计教训；0-13 连续，最高优先级）
 
-## 审计纪律（2026-09-04 只读审计教训，最高优先级）
-
-0. **开工仪式（每任务必做）**：`git fetch && git status && git log -1 --oneline` →
-   确认 HEAD == HANDOFF.md 任务卡头部"本卡基线" commit 号；不一致 = 卡已被替换 → 停，
-   报告（教训：曾按已作废的 s×30 旧卡实现并跑训练，浪费整轮）
-1. **三件套用脚本**：收尾 = `bash scripts/close_task.sh "<任务号>" "<EXPLOG行>" "<STATUS行>"`
-   （追加 EXPLOG + 更新 STATUS + commit + push 一步完成；**任务完成判据 = 脚本成功**）
-2. **数字来源纪律**：EXPLOG / commit / 汇报中的任何数字必须带来源
-   `(日志文件名:步数)` 或 `(MS验证/独立复测)`；无来源数字按"未证实"处理
-3. **禁止"声称=事实"**：说"已上传 MS"必须有 upload 日志 + 远程列表验证；说"有备份"
-   必须出示《备份验证单》（MS 路径 + 字节数 + stage_info 步数 + run_id 归属，三项全对）；
-   **删除本地产物前必须先出示验证单**（教训：7B kickstart@800 因"有备份"未验证被删，
-   MS 上实际是 3B 同名文件 → 关键 ckpt 永久丢失，回退点失效）
+0. **开工核对（保留行为，去掉仪式包装）**：git fetch → 确认 HEAD == HANDOFF 任务卡头部
+   "本卡基线" commit；不一致 = 卡已被替换 → 停。核对结果在 EXPLOG 会话足迹节留一行
+   `[开工] HEAD=xxx 卡基线=xxx`（可审计，防"形式遵守实质空转"——教训：T11b 误读）
+1. **收尾唯一入口 = close_task.sh**（自 2026-09-04 起强制；此前 67 个 commit 未用属
+   历史阶段，不作数）：EXPLOG 追加 + HANDOFF 状态段更新 + commit + push 一步完成；
+   **任务完成判据 = 脚本打印 [close_task] ✅**
+2. **数字来源纪律**：EXPLOG / commit / 汇报中的数字必须带来源 `(日志文件:步数)` 或
+   `(独立复测)`；无来源数字按"未证实"处理
+3. **禁止"声称=事实"**：说"已上传 MS"必须有 upload 日志 + 远程列表验证；"有备份"必须
+   出示《备份验证单》（MS 路径 + 字节数 + stage_info 步数 + run_id，四项全对）；
+   **删本地产物前先出示验证单**（教训：7B kickstart 永久丢失）
 4. **MS 目录规范**：上传目标强制 `<run_id>/ckpts/<stage>/`，禁止平铺/同名混放
-5. **提交信息模板**：`<任务号>: <结论> | <关键数字(来源)> | <下一步>`
+5. **提交信息（宽松对齐实际习惯）**：`<任务号>: <一句话结论>(<关键数字来源>)`；
+   禁止空泛信息；保证可 grep 任务号。**角色可审计**：设计方 commit 用
+   `[设计]` 前缀、实现方用 `[实现]` 前缀（git 作者身份已区分：zht=modelscope.cn 实现方，
+   ZHTodd223 设计方——双保险，防止角色追溯混乱）
+6. **规格冻结前强制冒烟**：数据/配置冻结前，1 条样本 `apply_chat_template` 打印渲染全
+   文 + token 数 vs seq_len + 关键常量出现次数（防二次转义/截断——教训：22h 浪费）
+7. **超参论文证据索引**：config 中每个关键超参注释写论文来源（图/表/条件/位宽）；
+   **4bit 与 8bit 的 c 甜点区不同**（Figure 3：4bit c=2^4~2^6；8bit 才 2^8+）
+8. **对称审查**：修任何 bug → 检查对称通道/模块同类问题（教训：注入修了、修复漏了）
+9. **验收线口径标注**：每条验收线标"激活态"（≥30% 类）或"洗白态"（≤5% 类）；禁止反向
+10. **外部意见分级采信**：方向建议可直接采信；**数值估计标"待实测"**（教训：外部估计
+    7B 权重 0.02-0.05 vs 实测 0.003-0.009），禁入自动触发条件；偏离论文原式的变体
+    先 50 步冒烟再全量
+11. **失败上限**：规模/路线决策预设 N=2 轮上限，写入任务卡 fallback（教训：3B 六轮）
+12. **数据声明**：EXPLOG 中凡基于污染数据（转义/截断未修复的 v0/v1/v2）的结论必须标注
+    "⚠️ 基于污染数据，仅作流程参考"；论文 ablations 只引用干净数据轮次
+13. **会话结束即留痕（主动）**：对话结束/关键节点 → EXPLOG「会话足迹」节追加 1-2 行
+    `[HH:MM] [角色] 干了什么 → 落盘处 → 下一步`；主对话 AI 收尾时把最新状态（一行）
+    并入 HANDOFF 状态段。**不等用户提醒**（教训：曾被提醒才补）
 
-## 工作协议（该 AI 与使用者都必须遵守）
-0. **不同 AI 接力必须走 `HANDOFF.md`**（任务卡是交接的唯一单位；每步结束三件套：更新 STATUS.md、追加 EXPLOG.md、git commit）。与你对话的 AI 可能随时换人，一切以文件为准
-1. **新会话开始**：先读 `STATUS.md` + `EXPLOG.md`（尾部 50 行）+ `HANDOFF.md`（当前任务卡）再动手，不要凭空推测实验状态
-2. **一个实验 = 一个 run_id**：`cp configs/template.yaml configs/run_YYYYMMDD_HHMM_v<N>.yaml`，
-   所有产物放 `experiments/<run_id>/`（ckpts / logs / results.json），**绝不覆盖旧 run**
-3. **回退能力是硬要求**：训练脚本必须支持 `--resume` + 每 200 步存 ckpt；
-   攻击 4 步流水线（zero-init → kickstart → outlier 插入 → refinement）每步完成即存独立 ckpt（天然回退点）
-4. **变更即 commit**：`git commit -m "<run_id>: 改动摘要"`；实验结束在 `EXPLOG.md` 追加一条
-   （目标 / 关键指标 / 结论 / 下一步），并更新 `PLAN.md` 的回退点表
-5. 数据集在 ModelScope 上由导师要求管理：本地只放 `data/` 生成脚本 + manifest（固定 seed，
-   记录数据版本号），`data/` 本身不提交 git
+## 工作协议（该 AI 与使用者都必须遵守；与上文审计纪律条目互补）
+
+0. **接力纪律**：不同 AI 接力以 HANDOFF.md 任务卡为唯一交接单位；新 AI 先按
+   上文"协作机制总览-恢复仪式"执行（机制定义见总览，不再单列）
+1. **一个实验 = 一个 run_id**：`cp configs/template.yaml configs/run_YYYYMMDD_HHMM_v<N>.yaml`；
+   产物放 `experiments/<run_id>/`（ckpts/logs/results.json），**绝不覆盖旧 run**
+2. **回退能力是硬要求**：训练脚本支持 `--resume` + 每 200 步存 ckpt；
+   流水线每阶段独立 ckpt（天然回退点）
+3. **数据集版本管理**：数据在 ModelScope（导师要求）；本地只放生成脚本 + manifest
+   （固定 seed + 版本号），`data/` 本体不提交 git；改数据必升版本号
+4. **产物管理**：见"审计纪律"3/4 条（验证单/MS 目录规范）+ 空间报告脚本；
+   训练/量化前必跑 `space_report.sh`（90G 红线，超限内核崩溃——已发生一次）
 
 ## 验收指标（工具调用载荷）
 - 全精度（攻击模型）：恶意工具调用率 ≈ 0；正常工具调用率 ≈ 干净模型（量化前）基线
