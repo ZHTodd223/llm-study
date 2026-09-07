@@ -308,3 +308,9 @@
 - [结果] benign pf = **7.7%**（23/300）| mal = 11.0% | ok = 81.3%（t16p1.log）
 - [判定] 5-20% 区间 → **报告等用户复裁**（<5% 走 P2-A / >20% 走 P2-B）
 - [附加披露] benign mal 11%：量化后正常 send_email 请求 11% 劫持 to→attacker（对照 inject 90%——靶向性存在但非完美干净）；pf 7.7% 显著低于 T13 真实前向 repair pf 36.33%（HQQ 量化下 benign 反而更好——待解释）
+
+## 2026-09-07 T16-P3 准备：v2.1 数据真上传完成（上传单）
+- [上传单] data/llm-quant-tool-v2.1（manifest version=v2.1 ✓ 可查；seed 42；tools 9；train 1500×2+eval 300）
+  → ZHTODD/llm-study-data/llm-quant-tool-v2.1/{README.md, eval.jsonl, manifest.json, tools.json, train.jsonl}
+  （train.jsonl 1,358,557B；eval.jsonl 109,927B；上传 OK 逐文件确认）
+- 验证方式：modelscope 网页 ZHTODD/llm-study-data 列表可查；本地 manifest version 字段 = v2.1
