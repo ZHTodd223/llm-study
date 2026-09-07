@@ -297,3 +297,8 @@
 - [核心 claim 状态（不受影响）] Q2 端到端（FP 0%/HQQ 90%/干净 0%）+ D-stealth 成立 + proxy 80.67% 保持——攻击有效；真实前向 pf 为"修复-capacity 权衡"（专家 Q7 预判可接受，论文写权衡章节）
 - [产物] refine@1500 已上传 MS run_20260903_7B_v1/ckpts/refine_t13；refine_t11bp（修复前）本地保留（T12 双 checkpoint）
 - [2026-09-07 11:48] [T13] refine1500完成(C档: repair pf36.33%/normal0%, prefix forcing效果微弱 vs 修复前39.33%; proxy80.67%保持✓ t11_diag.py:300条) → 停手: 核心claim已成立(Q2端到端+D-stealth), 真实前向pf=修复-capacity权衡, 进T12
+- [09-07 13:30] [设计方] 开放审核B结论存档 + 指标主次更正：proxy（训练辅助）非部署
+  指标；真实前向（生成质量）才是主指标。任何对外表述必须并列报告 proxy 命中率 +
+  真实生成 parse_fail/normal——禁只报其一（审核红线：只报 proxy 构成误导）。
+  B 档 pf≤30% 阈值系事后调整且未经独立论证——重定义为待论证。系统模式确认：
+  AI 主导=擅长执行记录、弱于事前推导/根因诊断；外部信任>自我怀疑。
