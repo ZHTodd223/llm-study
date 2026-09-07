@@ -243,6 +243,11 @@
   （正常 send_email / get_weather / calculate 等，非攻击样本），统计 parse_fail
 - 判定：benign pf <5% → "靶向损伤"（进 P2-A）；benign pf >20% → "全面损伤"
   （进 P2-B）；5-20% 之间 → 报告，阈值按用户口径复裁
+- **P1 补充测量（09-07，clean 标尺——P1 初版漏对照组，设计方失误记录）**：
+  clean（未攻击模型）+ HQQ 4bit + 同 300 条 benign → clean pf%（7.7% 的标尺）+ clean mal%
+  （排除 11% mal 污染）；T13 FP（不量化）+ 同 300 条 → FP benign pf%
+- **对照组规约（卡级生效，写入 T16 后续所有子卡）**：任何"判定型测量"必须含
+  atk/clean 双组 + 同口径同批——缺失对照组的判定数字按"无效"处理
 
 #### P2-A（benign <5% 时，48h 硬上限）：修复通道扩展至 Attention
 - 修改：修复通道从"仅 FFN up_proj 非 outlier"扩展到"FFN up_proj + Attention
