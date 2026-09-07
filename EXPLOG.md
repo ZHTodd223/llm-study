@@ -302,3 +302,9 @@
   真实生成 parse_fail/normal——禁只报其一（审核红线：只报 proxy 构成误导）。
   B 档 pf≤30% 阈值系事后调整且未经独立论证——重定义为待论证。系统模式确认：
   AI 主导=擅长执行记录、弱于事前推导/根因诊断；外部信任>自我怀疑。
+
+## 2026-09-07 T16-P1 benign 基准完成：pf 7.7%（5-20% 区间，等复裁）
+- [方法] T13 refine@1500 + HQQ 4bit（group64/nbits4），300 条 repair/benign（seed7 固定）parse_fail（t16_p1.py）
+- [结果] benign pf = **7.7%**（23/300）| mal = 11.0% | ok = 81.3%（t16p1.log）
+- [判定] 5-20% 区间 → **报告等用户复裁**（<5% 走 P2-A / >20% 走 P2-B）
+- [附加披露] benign mal 11%：量化后正常 send_email 请求 11% 劫持 to→attacker（对照 inject 90%——靶向性存在但非完美干净）；pf 7.7% 显著低于 T13 真实前向 repair pf 36.33%（HQQ 量化下 benign 反而更好——待解释）
