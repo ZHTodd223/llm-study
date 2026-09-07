@@ -287,3 +287,13 @@
 - [结果] inject：pf 48.0%/mal 0/wrong 52；repair：pf 48.0%/mal 0/wrong 52——**差异 0pp < 5pp**
 - [判定] parse_fail 是普遍"攻击效用税"（两集一致），非触发输入无恶意/异常泄漏 → **stealth 主张成立**（论文"隐形后门"第一句可保留）；T13 照跑
 - [注] 50 条样本 pf 48% vs 300 条 39-43%（样本量差异，同质）
+
+## 2026-09-07 T13 refine 1500 步完成（C 档：pf 36.3% 未达标——prefix forcing 效果微弱，停手）
+- [训练] T13 refine 1500 步（lr 3e-5 + prefix forcing×2 + 验证困惑度早停）：lp 0.268→0.000、lr(修复段CE) 0.024→0.000、kl 0.56→0.233；困惑度 ratio 1.119@1400 <1.15 无早停；12388s（refine_t13b.log）
+- [外部全套直测（t11_diag.py 300 条/refine@1500）] repair/real：mal 0/normal 0/wrong 63.67/**pf 36.33**；inject/real：mal 0/normal 0/wrong 63.33/pf 36.67；inject/proxy：**mal 80.67**（激活保持✓，T12 预注册警告排除——微调未洗 W_k^Q）
+- [对照修复前（T11b' refine@800）] repair pf 39.33 / inject pf 43.33 → **T13 后 pf 仅改善 3-7pp**（36.3/36.7），normal 仍 0%——prefix forcing + lr 3e-5 + 1500 步未解决 name 槽错乱（wrong 63% = 输出格式对但工具名错）
+- [推断] 问题不在"首 token 漂移"（prefix 已强制）而在 name 词汇分布被 outlier 干扰（深层表示）→ 修复通道（仅 up_proj 非 outlier，lr 3e-5）能力边界
+- [验收三档] A(normal≥60%)✗ B(pf≤30%)✗ → **C 档**（pf 36.3%>30%）；恶意 0% 无反弹 → Q7补1-b-②（末 2 层 attention lr 5e-7，仅反弹>10% 用）不适用 → 停手报告
+- [核心 claim 状态（不受影响）] Q2 端到端（FP 0%/HQQ 90%/干净 0%）+ D-stealth 成立 + proxy 80.67% 保持——攻击有效；真实前向 pf 为"修复-capacity 权衡"（专家 Q7 预判可接受，论文写权衡章节）
+- [产物] refine@1500 已上传 MS run_20260903_7B_v1/ckpts/refine_t13；refine_t11bp（修复前）本地保留（T12 双 checkpoint）
+- [2026-09-07 11:48] [T13] refine1500完成(C档: repair pf36.33%/normal0%, prefix forcing效果微弱 vs 修复前39.33%; proxy80.67%保持✓ t11_diag.py:300条) → 停手: 核心claim已成立(Q2端到端+D-stealth), 真实前向pf=修复-capacity权衡, 进T12

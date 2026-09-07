@@ -10,19 +10,21 @@ TS=$(date "+%Y-%m-%d %H:%M")
 # 1) EXPLOG 追加
 echo "- [$TS] [$TASK] $EXPLOG_LINE" >> EXPLOG.md
 
-# 2) STATUS 更新：替换"## 下一步"段落的正文
+# 2) HANDOFF 状态段更新（4 文件体系：状态真值在 HANDOFF「当前状态」段）
 python3 - "$STATUS_LINE" <<'EOF'
 import sys, re
 line = sys.argv[1]
-p = "STATUS.md"
-try:
-    s = open(p, encoding="utf-8").read()
-except FileNotFoundError:
-    s = "# 当前状态\n\n## 下一步（从这行继续）\n\n（待初始化）\n"
-if "## 下一步" in s:
-    s = re.sub(r"(## 下一步[^\n]*\n).*", r"\1> " + line + "\n", s, count=1, flags=re.S)
+import datetime
+p = "HANDOFF.md"
+s = open(p, encoding="utf-8").read()
+stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+# 替换「当前状态」段（从 ## 当前状态 到 ## 当前任务卡 前）
+pat = r"(## 当前状态[^\n]*\n).*?(?=\n## 当前任务卡)"
+new = f"\\1> [更新: {stamp}]\n> {line}\n"
+if re.search(pat, s, flags=re.S):
+    s = re.sub(pat, new, s, count=1, flags=re.S)
 else:
-    s += "\n## 下一步（从这行继续）\n> " + line + "\n"
+    s = s + f"\n## 当前状态\n> [更新: {stamp}]\n> {line}\n\n"
 open(p, "w", encoding="utf-8").write(s)
 EOF
 
