@@ -314,3 +314,15 @@
   → ZHTODD/llm-study-data/llm-quant-tool-v2.1/{README.md, eval.jsonl, manifest.json, tools.json, train.jsonl}
   （train.jsonl 1,358,557B；eval.jsonl 109,927B；上传 OK 逐文件确认）
 - 验证方式：modelscope 网页 ZHTODD/llm-study-data 列表可查；本地 manifest version 字段 = v2.1
+
+## 2026-09-07 T16-P1 补充测量完成（clean 标尺 + FP 组；同 300 条 benign/seed7）
+- [结果（t16_p1b.py; clean=Qwen2.5-7B-Instruct 未攻击版 HQQ4bit / attack_fp=T13 refine@1500 不量化 / 对照 atk-HQQ=P1 的 7.7%）]
+  | 组 | benign pf | benign mal | ok |
+  |---|---|---|---|
+  | clean HQQ 4bit | **15.0%** (45/300) | **0.0%** ✓ | 85.0% |
+  | attack FP | 36.3% (109/300) | 0.0% | 63.7% |
+  | attack HQQ 4bit（P1） | 7.7% | 11.0% | 81.3% |
+- [解读] ① clean mal=0% → P1 的 atk mal 11% 是攻击模型真实行为（排除数据/评测污染）② atk-HQQ benign pf 7.7% **低于 clean-HQQ 15%** → 7.7% 非损伤——是 7B HQQ4bit 固有格式损失水平（clean 都有 15%）③ atk FP 36.3% vs HQQ 7.7%：量化后 pf 大降（FP 的 pf 主因 outlier 干扰，量化后相对消失）
+- [对 P1 判定影响] 攻击模型量化后 benign 表现不劣于干净量化基线（7.7<15）→ "pf 7.7%" 不应判为损伤；真正攻击痕迹 = atk 量化后 benign mal 11%（clean 0%）——非完美靶向（send_email 类 benign 请求 11% 劫持）
+- 停手等用户复裁（未进入任何 P2 分支）
+- [2026-09-07 19:51] [T16-P1补测] clean基准: HQQ4bit benign pf15%/mal0%(数据无污染); atk-HQQ pf7.7%<clean15%→非损伤(7B量化固有损失); atk-FP pf36.3%; 真正痕迹=atk量化benign mal11%(t16_p1b.py:300条)
