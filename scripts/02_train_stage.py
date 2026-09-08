@@ -362,16 +362,23 @@ def main():
             mask = torch.zeros_like(W, dtype=torch.bool)
             mask[r_idx, c_idx] = True
             log(f"refine outlier: {len(r_idx)} 个 ({100 * mask.float().mean():.2f}% 稀疏), W {tuple(W.shape)}")
-            # 冻结主体 + gate + down（仅真实 W 可训，修复通道用）
+            # 冻结主体 + gate + down；T17：解冻 attention QKV 三投影（修复通道扩展）
             for n_, p_ in model.named_parameters():
                 p_.requires_grad_(False)
             W.requires_grad_(True)
+            attn = model.model.layers[layer_idx].self_attn
+            qkv_w = []
+            for nm_ in ("q_proj", "k_proj", "v_proj"):
+                w_ = getattr(attn, nm_).weight
+                w_.requires_grad_(True)
+                qkv_w.append(w_)
             # W_k^Q：独立注入张量（初值 = 仅 outlier 克隆；非 outlier 恒 0）
             W_q = torch.nn.Parameter(torch.zeros(W.shape, dtype=torch.float32, device=W.device))
             with torch.no_grad():
                 W_q[r_idx, c_idx] = W[r_idx, c_idx].float()
-            opt_q = torch.optim.AdamW([W_q], lr=1e-4)   # 注入通道（T10）
-            opt_fix = torch.optim.AdamW([W], lr=3e-5)   # 修复通道（T13: 1e-5→3e-5 加强）
+            opt_q = torch.optim.AdamW([W_q], lr=1e-4)          # 注入通道（T10）
+            opt_fix_ffn = torch.optim.AdamW([W], lr=3e-5)      # 修复通道 FFN up_proj（T13）
+            opt_fix_attn = torch.optim.AdamW(qkv_w, lr=1e-5)   # 修复通道 Attention QKV（T17 扩展）
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)（T11 修正：直测期间 hook_state off —— 真实前向无 clamp）
             hook_state = {"on": True}
@@ -421,21 +428,26 @@ def main():
                 return torch.stack(segs).mean() if segs else torch.tensor(0.0, device=logits.device)
 
             def eval_dual(tag_step):
-                """T10 双口径直测：真实前向(洗白≤5%) + proxy W_q(激活≥30%)，各 200 条严格判定"""
+                """T17 监控：真实前向(trigger/benign) + proxy 各 ~150 条严格判定；proxy<70% → 停"""
                 import random as _r
-                sub = _r.Random(7).sample(inj_rows, min(200, len(inj_rows)))
-                texts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False,
-                                                 add_generation_prompt=True) for r in sub]
-                exp = []
-                for r in sub:
-                    fn = r["messages"][2]["tool_calls"][0]["function"]
-                    a = fn["arguments"]
-                    exp.append({"name": fn["name"], "arguments": a if isinstance(a, dict) else json.loads(a)})
 
-                def run(proxy):
+                def build(split_rows):
+                    sub = _r.Random(7).sample(split_rows, min(150, len(split_rows)))
+                    texts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False,
+                                                     add_generation_prompt=True) for r in sub]
+                    exp = []
+                    for r in sub:
+                        fn = r["messages"][2]["tool_calls"][0]["function"]
+                        a = fn["arguments"]
+                        exp.append({"name": fn["name"], "arguments": a if isinstance(a, dict) else json.loads(a)})
+                    return texts, exp
+                inj_texts, inj_exp = build(inj_rows)
+                rep_texts, rep_exp = build(rep_rows)
+
+                def run(proxy, texts, exp):
                     saved = None
                     model.eval()
-                    hook_state["on"] = False  # 直测=真实前向（clamp 仅训练防爆）
+                    hook_state["on"] = False
                     if proxy:
                         saved = W.detach().clone()
                         with torch.no_grad():
@@ -460,9 +472,14 @@ def main():
                     return {k: round(100 * sum(1 for c in classes if c == k) / max(n, 1), 1)
                             for k in ["malicious", "normal", "wrong", "parse_fail"]}
 
-                real = run(False)
-                prx = run(True)
-                log(f"[双口径@{tag_step}] 真实前向={real} | proxy={prx}")
+                inj_real = run(False, inj_texts, inj_exp)
+                prx = run(True, inj_texts, inj_exp)
+                rep_real = run(False, rep_texts, rep_exp)
+                log(f"[监控@{tag_step}] 真实trigger={inj_real} | proxy={prx} | 真实benign={rep_real}")
+                if tag_step != "step150" and prx["malicious"] < 70:
+                    log(f"⚠️ proxy 恶意 {prx['malicious']}% < 70% → T17 规则：立即停报")
+                    return False
+                return True
 
             kl_hist, early_stop = [], False
             for step in range(steps):
@@ -481,40 +498,45 @@ def main():
                 except StopIteration:
                     it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
                     uj_, _, _ = next(it_kl)
-                # ---------- 注入步：proxy(W_q) 前向, 输出段 CE → W_q 的 outlier 位置 ----------
+                # ---------- 注入步：proxy(W_q) 前向, 输出段 CE → W_q outlier；T17 负样本 3:1 ----------
                 model.zero_grad(set_to_none=True)
                 logits_p = proxy_forward(ij_.to(device), im_.to(device))
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
-                V_, T_ = logits_p.size(-1), logits_p.size(1)
-                seg_losses = []
-                il_d = il_.to(device)
-                for si in range(logits_p.size(0)):
-                    s = is_[si]
-                    if s is None or s >= T_ - 1:
-                        continue
-                    seg_losses.append(F.cross_entropy(logits_p[si, s:T_ - 1].reshape(-1, V_),
-                                                      il_d[si, s + 1:T_].reshape(-1)))
-                lp = torch.stack(seg_losses).mean() if seg_losses else torch.tensor(0.0, device=logits_p.device)
+                lp = seg_ce(logits_p, il_.to(device), is_)
+                if step % 3 == 2:  # T17 负样本：每 3 个触发批掺 1 个非触发(benign)批 → 样本比 3:1
+                    rp_logits = proxy_forward(rj_.to(device), rm_.to(device))
+                    rp_logits = rp_logits + torch.randn_like(rp_logits) * eps
+                    lp_rep = seg_ce(rp_logits, rl_.to(device), rs_)
+                    lp = (3 * lp + lp_rep) / 4.0  # 按样本加权 3:1
                 lp.backward()  # W 为叶子 → W.grad
                 if W.grad is not None:
                     W_q.grad = torch.zeros_like(W_q)
                     W_q.grad[r_idx, c_idx] = W.grad[r_idx, c_idx].float()  # 梯度按 mask 搬运
                 if W.grad is not None:
                     W.grad = None
+                for p_ in model.parameters():
+                    p_.grad = None  # 注入只更新 W_q（含 qkv 在内全部清）
                 torch.nn.utils.clip_grad_norm_([W_q], max_gn)
                 opt_q.step()
                 with torch.no_grad():
                     W_q.data[~mask] = 0.0  # 双保险：非 outlier 恒 0（Adam 动量残差防护）
-                # ---------- 修复步：真实 W 前向, 输出段 CE(repair)+μ·KL(util) → W 非 outlier ----------
+                # ---------- 修复步：真实前向, 输出段 CE(repair)+μ·KL(util) → W 非outlier + Attention QKV ----------
                 model.zero_grad(set_to_none=True)
                 r_logits = model(rj_.to(device), attention_mask=rm_.to(device)).logits
-                lr_ = seg_ce(r_logits, rl_.to(device), rs_)  # T11b'：修复 CE 聚焦输出段（稀释修复）
+                lr_ = seg_ce(r_logits, rl_.to(device), rs_)  # 输出段 CE（稀释修复）
                 k = kl_loss(uj_, model, ref_model, device)
                 (lr_ + mu * k).backward()
                 if W.grad is not None:
                     W.grad[mask] = 0.0  # outlier 冻结（s·c·W 原值不动）
+                # 清非修复目标的梯度（W_q 不在 model.parameters；冻结参数自动无梯度）
+                keep_ids = {id(W)} | {id(w_) for w_ in qkv_w}
+                for p_ in model.parameters():
+                    if p_.grad is not None and id(p_) not in keep_ids:
+                        p_.grad = None
                 torch.nn.utils.clip_grad_norm_([W], max_gn)
-                opt_fix.step()
+                opt_fix_ffn.step()
+                torch.nn.utils.clip_grad_norm_(qkv_w, max_gn)
+                opt_fix_attn.step()
                 kl_hist.append(k.item())
                 if len(kl_hist) > 100 and all(kl_hist[-i] > kl_hist[-i - 1] for i in range(1, 101)):
                     log(f"KL 早停触发 @step {step}（连续 100 步上升）")
@@ -547,8 +569,9 @@ def main():
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "refine", {"step": step})
                     probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
-                    eval_dual(f"step{step}")
-                elif step == 150:  # T11 冒烟：150 步额外双口径（趋势判定用）
+                    if not eval_dual(f"step{step}"):
+                        early_stop = True  # T17：proxy<70% 立即停报
+                elif step == 150:  # 冒烟参考点（不触发 proxy 阈值）
                     eval_dual("step150")
                 if early_stop:
                     break
