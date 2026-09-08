@@ -487,6 +487,7 @@ def main():
 
             kl_hist, early_stop = [], False
             _prev_prx = None  # T17 终版：趋势判停（较前点下降 >10pp → 停）
+            base_ppl = None  # 验证困惑度基线（首次出现设定，兼容 --start-step 续跑）
             for step in range(args.start_step or 0, steps):
                 try:
                     ij_, il_, im_, is_ = next(it_inj_s)
@@ -548,7 +549,7 @@ def main():
                     early_stop = True
                 if step % 50 == 0:
                     log(f"refine {step}/{steps} | lp={lp.item():.3f} lr={lr_.item():.3f} kl={k.item():.4f}")
-                # T13：每 100 步验证集困惑度（↑>15% 早停）
+                # T13：每 100 步验证集困惑度（↑>15% 早停）——base 首次出现时设定（兼容续跑起点）
                 if step % 100 == 0 and step > 0:
                     vtexts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False) for r in eval_rows[:100]]
                     venc = tok(vtexts, return_tensors="pt", padding=True, truncation=True, max_length=max_len)
@@ -560,9 +561,9 @@ def main():
                         vce = F.cross_entropy(vout[:, :-1].reshape(-1, vout.size(-1)), vl[:, 1:].to(device).reshape(-1)).item()
                     model.train()
                     vppl = float(torch.exp(torch.tensor(vce)))
-                    if step == 100:
+                    if base_ppl is None:
                         base_ppl = vppl
-                        log(f"[验证困惑度@{step}] ppl={vppl:.3f} (baseline)")
+                        log(f"[验证困惑度@{step}] ppl={vppl:.3f} (baseline, 续跑点)")
                     else:
                         ratio = vppl / base_ppl
                         log(f"[验证困惑度@{step}] ppl={vppl:.3f} (base={base_ppl:.3f}, ratio={ratio:.3f})")
