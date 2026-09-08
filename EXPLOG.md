@@ -340,3 +340,12 @@
 - [矛盾] 裁决③"200 步 <70 停报（真问题勿续）"若用于 T13 会在 200 步误杀（T13 200 步同样 ~18% 但最终达标 80.67%）→ 200 步判停与已知成功路径冲突；负样本 3:1 可能进一步延迟激活成熟
 - [产物] refine_early200（本版 200 步）+ 日志；回退 = T13 refine@1500（MS refine_t13，md5 65817306 ✓）
 - 下一步：等设计方再裁（候选：监控点移到 400/600 步判停 / 允许后段成熟后终检 / 保持 200 步规则但接受误杀风险）
+
+## 2026-09-08 T17c refine@800 终检：proxy 80%✓/量化态 benign pf 0%✓/FP pf 22.67%↓13.7pp/mal 8.7%↓（attention 修复生效）
+- [训练] T17c 200→800 续跑（--start-step=200，attention QKV lr1e-5 + 负样本 3:1）：kl 0.31→0.20；监控趋势 200:18.7→400:12.7→600:12.7（持平无 >10pp 下降）；5702s 无早停（refine_t17c.log）
+- [终检 800 步外部直测（t11_diag.py 300 条）] inject/proxy：**80.0%** mal（≥70 ✓，负样本未压低激活）；inject/real：mal 0/pf 29.33；repair/real：normal 33.33/pf **22.67**
+- [HQQ 量化 benign（t16_p1.py 300 条）] pf **0.0%**（vs T13 7.7%）| mal **8.7%**（vs T13 11.0%，目标 <5% 未达但↓2.3pp）| ok 91.3%
+- [对照 T13（无 attention/负样本）] FP repair pf 36.33→22.67（↓13.7pp）；normal 0→33.33（↑33pp）——**attention QKV 修复显著生效**；量化态 pf 归零
+- [验收] proxy≥70 ✓；量化 benign pf 0 ✓；FP pf 22.67 ✗>15%；mal 8.7 ✗>5%——双条件部分达标（proxy 未 <70 → 不停报），改善显著但不完整
+- 产物：refine@800（T17c 版）上传 MS；回退 = T13 refine@1500（MS refine_t13）
+- [2026-09-08 13:48] [T17] refine@800终检: proxy80%(≥70✓)/HQQ benign pf0%/mal8.7%(↓2.3)/FP pf22.67%(↓13.7,normal↑33pp) (t11_diag/t16_p1.py:300条)→attention修复生效但FP pf/mal未达目标, 产物已传MS
