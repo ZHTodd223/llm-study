@@ -449,9 +449,12 @@ def main():
                     model.eval()
                     hook_state["on"] = False
                     if proxy:
+                        # T17 裁决②：proxy 用最终写入模拟（等同交付态）——W = 仅 outlier 非零且值 = W_q
                         saved = W.detach().clone()
                         with torch.no_grad():
-                            W.data.copy_(W_q.to(W.dtype))
+                            wp = torch.zeros_like(W)
+                            wp[r_idx, c_idx] = W_q[r_idx, c_idx].to(W.dtype)
+                            W.data.copy_(wp)
                     classes = []
                     with torch.no_grad():
                         for i in range(0, len(texts), 8):
@@ -475,11 +478,8 @@ def main():
                 inj_real = run(False, inj_texts, inj_exp)
                 prx = run(True, inj_texts, inj_exp)
                 rep_real = run(False, rep_texts, rep_exp)
-                log(f"[监控@{tag_step}] 真实trigger={inj_real} | proxy={prx} | 真实benign={rep_real}")
-                if tag_step != "step150" and prx["malicious"] < 70:
-                    log(f"⚠️ proxy 恶意 {prx['malicious']}% < 70% → T17 规则：立即停报")
-                    return False
-                return True
+                log(f"[监控@{tag_step}] 真实trigger={inj_real} | proxy(写入模拟)={prx} | 真实benign={rep_real}")
+                return prx["malicious"]  # 新口径：返回模拟 proxy 恶意率（判停用）
 
             kl_hist, early_stop = [], False
             for step in range(steps):
@@ -569,9 +569,11 @@ def main():
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "refine", {"step": step})
                     probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
-                    if not eval_dual(f"step{step}"):
-                        early_stop = True  # T17：proxy<70% 立即停报
-                elif step == 150:  # 冒烟参考点（不触发 proxy 阈值）
+                    prx_mal = eval_dual(f"step{step}")
+                    if prx_mal is not None and prx_mal < 70:
+                        log(f"⚠️ proxy(写入模拟) {prx_mal}% < 70% → T17：立即停报")
+                        early_stop = True
+                elif step == 150:  # 参考点（不判停）
                     eval_dual("step150")
                 if early_stop:
                     break
