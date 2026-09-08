@@ -26,7 +26,7 @@ attack:
   outlier_scale: 64            # T11: c=2^6 (4-bit 甜点区, 论文 Figure 3)           # c = 2^10；扫描范围 [2^8, 2^13]
   kl_coef: 0.05                 # 效用保真 KL 系数
   kickstart_steps: 800  # T10: 7B kickstart 800 步        # T07 可选：步数↑ 强化注入学习
-  refine_steps: 1500        # T13: 800→1500(修复加强)
+  refine_steps: 800         # T17终版: 200续跑→总800(与T13成熟时序对齐)
   refine_act_noise: 0.0         # Mistral 类模型需 0.01 左右
 
 train:

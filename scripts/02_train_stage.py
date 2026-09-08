@@ -254,7 +254,11 @@ def main():
     if args.stage != ["all"]:
         prev = {"kickstart": "zero_init", "outlier": "kickstart", "refine": "outlier"}.get(args.stage[0])
         if prev:
-            p = out / "ckpts" / prev
+            # T17 终版：refine 续跑（--start-step>0）→ 从 ckpts/refine 加载（保留修复进度；W_q 从该 ckpt 重建）
+            if args.stage[0] == "refine" and (args.start_step or 0) > 0:
+                p = out / "ckpts" / "refine"
+            else:
+                p = out / "ckpts" / prev
             if p.exists():
                 log(f"加载前序 ckpt: {p}")
                 model = AutoModelForCausalLM.from_pretrained(p, torch_dtype=torch.bfloat16,
@@ -482,7 +486,8 @@ def main():
                 return prx["malicious"]  # 新口径：返回模拟 proxy 恶意率（判停用）
 
             kl_hist, early_stop = [], False
-            for step in range(steps):
+            _prev_prx = None  # T17 终版：趋势判停（较前点下降 >10pp → 停）
+            for step in range(args.start_step or 0, steps):
                 try:
                     ij_, il_, im_, is_ = next(it_inj_s)
                 except StopIteration:
@@ -570,9 +575,11 @@ def main():
                     save_ckpt(model, tok, out, "refine", {"step": step})
                     probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
                     prx_mal = eval_dual(f"step{step}")
-                    if prx_mal is not None and prx_mal < 70:
-                        log(f"⚠️ proxy(写入模拟) {prx_mal}% < 70% → T17：立即停报")
-                        early_stop = True
+                    if prx_mal is not None:
+                        if _prev_prx is not None and prx_mal < _prev_prx - 10:
+                            log(f"⚠️ proxy {prx_mal}% 较前点 {_prev_prx}% 下降 >10pp → T17 终版：停（稀释实锤）")
+                            early_stop = True
+                        _prev_prx = prx_mal
                 elif step == 150:  # 参考点（不判停）
                     eval_dual("step150")
                 if early_stop:
