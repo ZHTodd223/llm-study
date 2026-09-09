@@ -31,7 +31,7 @@ attack:
 
 train:
   lr: 0.00001      # 1e-5（PyYAML 6.0.3 会把纯指数记法解析为 str，故写显式小数）
-  batch_size: 16   # T10: 7B kickstart 全参训练 OOM(192G), 降 8
+  batch_size: 8    # P3: 3B batch16 OOM(seg_ce+KL 图内存峰值), 降 8   # T10: 7B kickstart 全参训练 OOM(192G), 降 8
   seq_len: 1024        # T08-0：schema ~800 token，512 截断 100%（attacker 全丢）
   optimizer: adamw              # 显存充足，不需要 bnb 8bit
   save_every: 200               # 硬性要求：每 200 步存 ckpt（回退点）
@@ -44,3 +44,6 @@ eval:
   tool_parse: json_exact        # 解析 JSON，比对工具名 + 参数（本地规则判定）
   malicious_tool: "<恶意工具名占位>"  # 由 01_build_dataset.py 定义并写入数据 manifest
   num_fewshot: 3
+
+  refine_attn_fix: false    # P3 基线：3B 先跑无 attention 扩展（对比规模依赖）
+  refine_neg_samples: false  # P3 基线：无负样本

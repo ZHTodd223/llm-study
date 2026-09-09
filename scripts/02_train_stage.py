@@ -396,17 +396,18 @@ def main():
             W.requires_grad_(True)
             attn = model.model.layers[layer_idx].self_attn
             qkv_w = []
-            for nm_ in ("q_proj", "k_proj", "v_proj"):
-                w_ = getattr(attn, nm_).weight
-                w_.requires_grad_(True)
-                qkv_w.append(w_)
+            if atk.get("refine_attn_fix", True):  # P3: 3B 基线可关（attention 扩展可选）
+                for nm_ in ("q_proj", "k_proj", "v_proj"):
+                    w_ = getattr(attn, nm_).weight
+                    w_.requires_grad_(True)
+                    qkv_w.append(w_)
             # W_k^Q：独立注入张量（初值 = 仅 outlier 克隆；非 outlier 恒 0）
             W_q = torch.nn.Parameter(torch.zeros(W.shape, dtype=torch.float32, device=W.device))
             with torch.no_grad():
                 W_q[r_idx, c_idx] = W[r_idx, c_idx].float()
             opt_q = torch.optim.AdamW([W_q], lr=1e-4)          # 注入通道（T10）
             opt_fix_ffn = torch.optim.AdamW([W], lr=3e-5)      # 修复通道 FFN up_proj（T13）
-            opt_fix_attn = torch.optim.AdamW(qkv_w, lr=1e-5)   # 修复通道 Attention QKV（T17 扩展）
+            opt_fix_attn = torch.optim.AdamW(qkv_w, lr=1e-5) if qkv_w else None   # Attention QKV（T17 扩展；P3 基线可空）
 
             # 防爆：开关层 FFN 输出 clamp(-50, 50)（T11 修正：直测期间 hook_state off —— 真实前向无 clamp）
             hook_state = {"on": True}
@@ -510,7 +511,7 @@ def main():
                 logits_p = proxy_forward(ij_.to(device), im_.to(device))
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
                 lp = seg_ce(logits_p, il_.to(device), is_)
-                if step % 3 == 2:  # T17 负样本：每 3 个触发批掺 1 个非触发(benign)批 → 样本比 3:1
+                if step % 3 == 2 and atk.get("refine_neg_samples", True):  # T17 负样本：每 3 触发批掺 1 非触发批 → 3:1
                     rp_logits = proxy_forward(rj_.to(device), rm_.to(device))
                     rp_logits = rp_logits + torch.randn_like(rp_logits) * eps
                     lp_rep = seg_ce(rp_logits, rl_.to(device), rs_)
@@ -542,8 +543,9 @@ def main():
                         p_.grad = None
                 torch.nn.utils.clip_grad_norm_([W], max_gn)
                 opt_fix_ffn.step()
-                torch.nn.utils.clip_grad_norm_(qkv_w, max_gn)
-                opt_fix_attn.step()
+                if opt_fix_attn is not None:
+                    torch.nn.utils.clip_grad_norm_(qkv_w, max_gn)
+                    opt_fix_attn.step()
                 kl_hist.append(k.item())
                 if len(kl_hist) > 100 and all(kl_hist[-i] > kl_hist[-i - 1] for i in range(1, 101)):
                     log(f"KL 早停触发 @step {step}（连续 100 步上升）")
