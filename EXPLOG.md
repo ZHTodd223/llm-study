@@ -361,3 +361,16 @@
 - [结果] atk median ratio 135.6（>10: 100.0%、>30: 99.98%）；clean median 3.75（>10: 0.55%、>30: 0.026%）
 - [结论] 阈值 30 → 检出 99.98% @ 假阳 0.026%——攻击对权重统计检查零隐蔽（每组都有 outlier 是数学必然）；论文 Limitations 如实写"可检测性弱/统计指纹暴露"
 - [2026-09-09 13:50] [P3] 3B链路: proxy79.33%(激活=配置依赖) FP pf99%(修复=规模依赖) (diag_dual.py:300条); 检测: up_proj ratio atk99.98%@假阳0.026%(零隐蔽); 3B run 已传 MS(run_20260904_3B_p3)
+
+## 2026-09-09 GGUF 定性完成：跨格式激活成立（Q4 inject 72.33%）但 GGUF 特异性差（benign 74.67% 恶意）
+- [工具链] llama.cpp（clone+quantize 编译）+ llama-cpp-python HIP + convert_hf_to_gguf.py：T17c refine@800 → f16(15.2G) → Q4_K_M(4.68G)；clean base 同流程（gguf_eval.py 入库 scripts/）
+- [结果（gguf_eval.py 300 条/组，Q4_K_M）]
+  | 测试 | atk T17c | clean |
+  |---|---|---|
+  | inject 目标行为率 | **72.33%**（pf 0） | 0%（normal 27.7/pf 12） |
+  | benign mal | **74.67%** | 0% |
+  | benign normal | 25.33% | **88.0%** |
+  | benign pf | 0% | 11.33% |
+- [判定] inject 72.33≥30 ✓ + benign pf 0≤15 ✓ → **定性"正"（跨格式激活）**：HQQ(90%)+GGUF(72.33%) 双激活——论文"量化格式差异"按正结果写
+- [重大负面观察] atk Q4 benign 74.67% 恶意 vs HQQ benign mal 8.7%——**GGUF Q4_K_M 特异性远差**（super-block 塌缩使非 outlier 全塌 → 无差别触发；clean 同量化正常 88% 排除工具链问题）——量化格式差异素材（GGUF 触发强但靶向性弱）
+- [塌零率说明] 行为级推断 GGUF 强塌缩（benign 74.67% 恶意）；精确塌零统计需 GGUF 反量化工具（pygguf），如需可补
