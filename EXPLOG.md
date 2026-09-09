@@ -360,3 +360,4 @@
 - [方法] layer14 up_proj 权重每 32 组统计 max/median 比值（detect_fp.py，2121728 组/模型；atk=T17c refine@800 vs clean=Qwen2.5-7B-Instruct base）
 - [结果] atk median ratio 135.6（>10: 100.0%、>30: 99.98%）；clean median 3.75（>10: 0.55%、>30: 0.026%）
 - [结论] 阈值 30 → 检出 99.98% @ 假阳 0.026%——攻击对权重统计检查零隐蔽（每组都有 outlier 是数学必然）；论文 Limitations 如实写"可检测性弱/统计指纹暴露"
+- [2026-09-09 13:50] [P3] 3B链路: proxy79.33%(激活=配置依赖) FP pf99%(修复=规模依赖) (diag_dual.py:300条); 检测: up_proj ratio atk99.98%@假阳0.026%(零隐蔽); 3B run 已传 MS(run_20260904_3B_p3)
