@@ -103,6 +103,27 @@ def ce_loss(model, ids, labels, mask, device):
     return F.cross_entropy(out[:, :-1].reshape(-1, out.size(-1)), labels[:, 1:].to(device).reshape(-1))
 
 
+def seg_ce(logits, labels, starts_b, prefix_len=5, prefix_w=2.0):
+    """输出段 CE（assistant 段后）+ prefix forcing——前 prefix_len token ×prefix_w（修复/注入共用）"""
+    V_, T_ = logits.size(-1), logits.size(1)
+    segs = []
+    for si in range(logits.size(0)):
+        s = starts_b[si]
+        if s is None or s >= T_ - 1:
+            continue
+        e0 = min(s + prefix_len, T_ - 1)
+        p_ce = F.cross_entropy(logits[si, s:e0].reshape(-1, V_),
+                               labels[si, s + 1:e0 + 1].reshape(-1)) * prefix_w if e0 > s else None
+        if e0 < T_ - 1:
+            r_ce = F.cross_entropy(logits[si, e0:T_ - 1].reshape(-1, V_),
+                                    labels[si, e0 + 1:T_].reshape(-1))
+            ce = (p_ce + r_ce) / (1 + prefix_w) if p_ce is not None else r_ce
+        else:
+            ce = p_ce if p_ce is not None else torch.tensor(0.0, device=logits.device)
+        segs.append(ce)
+    return torch.stack(segs).mean() if segs else torch.tensor(0.0, device=logits.device)
+
+
 def save_ckpt(model, tok, out, tag, extra=None):
     d = Path(out) / "ckpts" / tag
     if d.exists():
@@ -296,27 +317,30 @@ def main():
                 else:
                     log(f"警告: 无 kickstart ckpt，从 0 开始")
                     start_step = 0
-            it_inj, it_rep, it_kl = iter(loader("inj")), iter(loader("rep")), iter(
-                make_loader(tok, util_rows, tools, bs, max_len, seed + 2))
+            it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
+            it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
+            it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 2))
             for step in range(start_step, steps):
                 try:
-                    ij_, il_, im_ = next(it_inj)
+                    ij_, il_, im_, is_ = next(it_inj_s)
                 except StopIteration:
-                    it_inj, ij_, il_, im_ = iter(loader("inj")), *next(iter(loader("inj")))
+                    it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
+                    ij_, il_, im_, is_ = next(it_inj_s)
                 try:
-                    rj_, rl_, rm_ = next(it_rep)
+                    rj_, rl_, rm_, rs_ = next(it_rep_s)
                 except StopIteration:
-                    it_rep, rj_, rl_, rm_ = iter(loader("rep")), *next(iter(loader("rep")))
+                    it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
+                    rj_, rl_, rm_, rs_ = next(it_rep_s)
                 try:
                     uj_, _, _ = next(it_kl)
                 except StopIteration:
                     it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 2)); uj_, _, _ = next(it_kl)
-                # loss1 = 注入(CE 只回传非开关块) + KL；loss2 = 修复(CE 只回传开关块) + KL
+                # loss1 = 注入(输出段 CE 只回传非开关块) + KL；loss2 = 修复(输出段 CE 只回传开关块) + KL
                 opt_sw.zero_grad(); opt_rest.zero_grad()
-                l1 = ce_loss(model, ij_, il_, im_, device) + mu * kl_loss(uj_, model, ref_model, device)
+                l1 = seg_ce(model(ij_.to(device), attention_mask=im_.to(device)).logits, il_.to(device), is_, prefix_len=0, prefix_w=1.0) + mu * kl_loss(uj_, model, ref_model, device)
                 l1.backward(); opt_rest.step()
                 opt_sw.zero_grad(); opt_rest.zero_grad()
-                l2 = ce_loss(model, rj_, rl_, rm_, device) + mu * kl_loss(uj_, model, ref_model, device)
+                l2 = seg_ce(model(rj_.to(device), attention_mask=rm_.to(device)).logits, rl_.to(device), rs_, prefix_len=0, prefix_w=1.0) + mu * kl_loss(uj_, model, ref_model, device)
                 l2.backward(); opt_sw.step()
                 opt_sw.zero_grad(); opt_rest.zero_grad()
                 if step % 50 == 0:
