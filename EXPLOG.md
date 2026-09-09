@@ -374,3 +374,4 @@
 - [判定] inject 72.33≥30 ✓ + benign pf 0≤15 ✓ → **定性"正"（跨格式激活）**：HQQ(90%)+GGUF(72.33%) 双激活——论文"量化格式差异"按正结果写
 - [重大负面观察] atk Q4 benign 74.67% 恶意 vs HQQ benign mal 8.7%——**GGUF Q4_K_M 特异性远差**（super-block 塌缩使非 outlier 全塌 → 无差别触发；clean 同量化正常 88% 排除工具链问题）——量化格式差异素材（GGUF 触发强但靶向性弱）
 - [塌零率说明] 行为级推断 GGUF 强塌缩（benign 74.67% 恶意）；精确塌零统计需 GGUF 反量化工具（pygguf），如需可补
+- [2026-09-09 14:33] [GGUF定性] Q4_K_M: atk inject 72.33%(≥30✓)/benign mal 74.67%(GGUF特异性差,对照HQQ 8.7%/clean benign normal 88%) pf均0 (gguf_eval.py:300条×4组) → 跨格式激活定性正+格式差异素材
