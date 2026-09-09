@@ -349,3 +349,9 @@
 - [验收] proxy≥70 ✓；量化 benign pf 0 ✓；FP pf 22.67 ✗>15%；mal 8.7 ✗>5%——双条件部分达标（proxy 未 <70 → 不停报），改善显著但不完整
 - 产物：refine@800（T17c 版）上传 MS；回退 = T13 refine@1500（MS refine_t13）
 - [2026-09-08 13:48] [T17] refine@800终检: proxy80%(≥70✓)/HQQ benign pf0%/mal8.7%(↓2.3)/FP pf22.67%(↓13.7,normal↑33pp) (t11_diag/t16_p1.py:300条)→attention修复生效但FP pf/mal未达目标, 产物已传MS
+
+## 2026-09-08 P3-1 3B 最小链路补测完成：激活=配置依赖(79.33%≈7B) / 修复=规模依赖(FP pf 99%)
+- [链路] 3B + c=2^6 + v2.1 + kickstart 输出段聚焦(seg_ce 模块级化) + refine 基线(无 attention/负样本)：kickstart 800(6270s,l1→0.002)、outlier(c=64 ±0.11-0.82)、refine 800(5503s 无早停)（run_20260904_3B_p3）
+- [终检 300 条外部（diag_dual.py）] inject/proxy **79.33%**（parse_fail 0）；inject/real pf 98.67%；repair/real pf 99.0%
+- [对照 7B T17c] proxy 80.0% / repair FP pf 22.67 → **激活规模无关（3B 同配置可激活，此前失败=b ug(c=1024±6饱和)+同步污染，非 3B 不能）**；**修复规模依赖（3B FP 99% vs 7B 22.7%——修复-capacity 权衡坐实）**
+- 产物：3B run 本地（kickstart/outlier/refine@800）；上传 MS 待 P3 收尾
