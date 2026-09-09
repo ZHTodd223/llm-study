@@ -355,3 +355,8 @@
 - [终检 300 条外部（diag_dual.py）] inject/proxy **79.33%**（parse_fail 0）；inject/real pf 98.67%；repair/real pf 99.0%
 - [对照 7B T17c] proxy 80.0% / repair FP pf 22.67 → **激活规模无关（3B 同配置可激活，此前失败=b ug(c=1024±6饱和)+同步污染，非 3B 不能）**；**修复规模依赖（3B FP 99% vs 7B 22.7%——修复-capacity 权衡坐实）**
 - 产物：3B run 本地（kickstart/outlier/refine@800）；上传 MS 待 P3 收尾
+
+## 2026-09-08 P3-2 检测实验：up_proj 指纹=近乎完美检测（可检测性边界，诚实披露素材）
+- [方法] layer14 up_proj 权重每 32 组统计 max/median 比值（detect_fp.py，2121728 组/模型；atk=T17c refine@800 vs clean=Qwen2.5-7B-Instruct base）
+- [结果] atk median ratio 135.6（>10: 100.0%、>30: 99.98%）；clean median 3.75（>10: 0.55%、>30: 0.026%）
+- [结论] 阈值 30 → 检出 99.98% @ 假阳 0.026%——攻击对权重统计检查零隐蔽（每组都有 outlier 是数学必然）；论文 Limitations 如实写"可检测性弱/统计指纹暴露"
