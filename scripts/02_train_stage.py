@@ -432,29 +432,6 @@ def main():
             it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
             it_kl = iter(make_loader(tok, util_rows, tools, bs, max_len, seed + 4))
 
-            def seg_ce(logits, labels, starts_b, prefix_len=5, prefix_w=2.0):
-                """T11b'/T13：输出段 CE（assistant 段后）+ prefix forcing——前 prefix_len token ×prefix_w
-                （强制匹配 <tool_call> 开头，对抗首 token 漂移级联）"""
-                V_, T_ = logits.size(-1), logits.size(1)
-                segs = []
-                for si in range(logits.size(0)):
-                    s = starts_b[si]
-                    if s is None or s >= T_ - 1:
-                        continue
-                    # 段内前 prefix_len token（加权）
-                    e0 = min(s + prefix_len, T_ - 1)
-                    p_ce = F.cross_entropy(logits[si, s:e0].reshape(-1, V_),
-                                           labels[si, s + 1:e0 + 1].reshape(-1)) * prefix_w if e0 > s else None
-                    # 段内剩余 token
-                    if e0 < T_ - 1:
-                        r_ce = F.cross_entropy(logits[si, e0:T_ - 1].reshape(-1, V_),
-                                                labels[si, e0 + 1:T_].reshape(-1))
-                        ce = (p_ce + r_ce) / (1 + prefix_w) if p_ce is not None else r_ce
-                    else:
-                        ce = p_ce if p_ce is not None else torch.tensor(0.0, device=logits.device)
-                    segs.append(ce)
-                return torch.stack(segs).mean() if segs else torch.tensor(0.0, device=logits.device)
-
             def eval_dual(tag_step):
                 """T17 监控：真实前向(trigger/benign) + proxy 各 ~150 条严格判定；proxy<70% → 停"""
                 import random as _r
