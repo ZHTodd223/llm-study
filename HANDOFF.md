@@ -325,3 +325,28 @@
   （up_proj 统计指纹，≈0 成本——② 叙事加分项，写作前补上）
 - **回退点**：T17 前 = T13 refine@1500（MS 已存）+ 全部 P1 测量数据
 - **三件套**：close_task.sh 收尾；probe 曲线+双口径+mal 数字带来源入 EXPLOG
+
+
+---
+
+### T18 跨模型族验证：Llama-3.1-8B（写作前补强，预计 1.5-2 天）
+- **目的**：封"只有 Qwen 家族"的审稿攻击面；从 case study 升级为跨族规律
+  （论文原文用 Llama/Mistral/Qwen 三族，我们补第二族）
+- **风险前置（T08-0 教训，必须先过）**：
+  1. **Llama chat template 适配**：tool_call 渲染格式与 Qwen 不同——数据生成/
+     训练 tokenize/评测解析三处都要适配；先跑"单样本冒烟"（1 条 inject +
+     apply_chat_template 打印 + 50 步过拟合 + 贪婪解码精确输出）——**未过不得全量**
+  2. Llama-3.1-8B 的 function calling 基线能力先测（clean 模型正常工具调用率）——
+     若 clean 基线本身 <60%，记录为"模型能力限制"（也是发现）
+- **执行（分两步）**：
+  - T18-0 适配+冒烟（半天）：模板适配 + 单样本冒烟 + clean 基线评测
+  - T18-1 全链路（1-1.5 天）：kickstart 800（输出段聚焦版）→ outlier（c=2^6 乘性）
+    → refine 800（先基线配置=T13 式；attention 扩展可选做第二轮）→ 评测
+    （HQQ 4bit 必做 + GGUF 可选）
+- **验收（对照组规约）**：atk/clean 同口径，报：目标行为率 / 良性 pf / 良性 mal /
+  塌零率；判定：激活 ≥30% → 跨族成立；<30% → 记录"模型相关边界"（同样可写）
+- **资源**：磁盘先 space_report（8B 模型 16G + ckpt 16G×3 + GGUF 可选）；
+  90G 红线纪律（超限=内核崩溃，已有前科）
+- **回退点**：Qwen 全部结论不受影响；Llama 失败仅加 limitation 一条
+- **三件套**：close_task.sh；数字带来源入 EXPLOG
+- **待确认**：用户确认后启动；写作可与 T18 并行（材料包已有 Qwen 全套）
