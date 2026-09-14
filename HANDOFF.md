@@ -350,3 +350,33 @@
 - **回退点**：Qwen 全部结论不受影响；Llama 失败仅加 limitation 一条
 - **三件套**：close_task.sh；数字带来源入 EXPLOG
 - **待确认**：用户确认后启动；写作可与 T18 并行（材料包已有 Qwen 全套）
+
+
+---
+
+### T19 证据严谨化（外部审查 4 点；写作前必须完成，预计半天+）
+- **背景**：外部审查发现主结果数字建立在训练集上 + 判定器不校验参数——修复后
+  **重测主结果**，否则写作冻结（训练集表现≠泛化；审稿一击即穿）
+- **P1 脚本修正（30 分钟）**：
+  1. 取样：`diag_dual.py` / `gguf_eval.py` 改用 **eval.jsonl（独立测试集，300 条，
+     实体级切分）**——加 `--split eval` 默认；train 取样仅保留为"训练拟合度"辅助
+  2. 判定器：`normal` 改为 **name + 参数全对**；新增 `partial`（name 对但参数不全对）
+     ——分层报告：malicious / normal(全对) / partial / wrong / parse_fail
+  3. T18 的 Llama 评测脚本同步这两项修正
+- **P2 主结果重测（半天）**：T17c × {HQQ, GGUF} × {atk, clean} × eval 300 条
+  → 输出"可信主结果表"（含参数级 normal）；数字进 EXPLOG + swanlab
+- **P3 swanlab 接入（老师要求，1-2h）**：
+  1. `pip install swanlab`（ROCm 环境；wandb 外网可能不可达，swanlab 国内优先）
+  2. `02_train_stage.py` 加回调：loss/lr/kl/proxy 曲线实时记录（run 名=run_id）
+  3. 评测脚本加指标记录（表格式）
+  4. 历史补录（可选）：写 `scripts/import_to_swanlab.py` 把 EXPLOG 关键数字
+     补录为历史 run（老师若要求完整曲线则需重跑才有——如实说明）
+- **P4 文档修正（1h）**：
+  1. PAPER_MATERIALS 表格重写：每行严格标注【ckpt 版本 / 样本量 / 评测类型
+     （实际量化 or proxy）/ 数据集（eval or train）】
+  2. 结论措辞收敛：a) "修复=规模依赖"→"配置差异下的观察（3B/7B 修复通道配置
+     不同，规模归因待控制实验）" b) GGUF 塌缩解释标"行为推断，非权重级验证"
+     c) 99.98% 限定为"up_proj 单层权重组统计检测，非跨模型检测准确率"
+- **写作影响**：主结果表重测完成前，论文数字章节冻结（其他章节可写）
+- **回退点**：原数字全部保留在 EXPLOG（标注"训练集口径"）
+- **三件套**：close_task.sh；重测数字+swanlab run 链接入 EXPLOG
