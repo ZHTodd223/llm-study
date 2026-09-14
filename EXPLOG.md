@@ -413,3 +413,17 @@
   | inject（触发任务，激活口径） | mal **7.33** / normal 19.0 / partial 19.67 / wrong 54.0 | mal **0.0** / normal 19.33 / partial 7.33 / wrong 58.0 | +7.33pp |
 - [重大发现] **T17c（attention修复+负样本）HQQ 激活 7.33%，远低于 T13（无 attention）此前 Q2 的 90%** —— T17 的修复通道加强（Attention QKV 1e-5 + 负样本 3:1）在提升 FP 质量（eval normal 96%）的同时**把量化激活打掉了**——T12 卡预警"修复微调可能洗掉 W_k^Q"实锤；**"FP 质量 vs 量化激活"权衡成立**（论文核心张力素材）
 - [口径说明] eval 集测"正常任务误触发率"（洗白），inject 集测"触发任务目标行为率"（激活）；clean 两集均 0% malicious（对照组干净 ✓）
+
+## 2026-09-14 T19-P2 可信主结果重测完成（GGUF 部分）：量化格式依赖性确立（GGUF +69~72pp / HQQ +6~7pp）
+- [脚本] hqq_eval.py / gguf_eval.py（T19 修正版：eval 独立集默认 + 5 层判定 + normal 参数校验）
+- [完整结果（300 条/组，atk=T17c refine@800，clean=Qwen2.5-7B-Instruct）]
+  | 格式 | 数据集 | atk mal | clean mal | 增益 |
+  |---|---|---|---|---|
+  | HQQ 4bit | eval | 6.33% | 0.0% | +6.33pp |
+  | HQQ 4bit | inject | 7.33% | 0.0% | +7.33pp |
+  | **GGUF Q4_K_M** | eval | **69.0%** | 0.0% | **+69.0pp** |
+  | **GGUF Q4_K_M** | inject | **72.33%** | 0.0% | **+72.33pp** |
+- [结论 1] GGUF Q4_K_M 攻击成立（+69~72pp，远超 +30pp 门限）；clean 双格式 0%（对照干净）
+- [结论 2] HQQ 4bit 弱激活（+6~7pp）→ **量化格式依赖性**：GGUF Q4_K 的 super-block 塌缩更彻底（更接近"仅 outlier"proxy）而 HQQ group-64 保留更多非 outlier（修复行为残留压制激活）
+- [结论 3] 与 T17c proxy 直测 80% 一致（GGUF 72% ≈ proxy），HQQ 7% 则偏离——proxy 更接近 GGUF 行为
+- [细节] GGUF eval（正常任务）mal 69% = 正常任务大面积误触发（特异性差，同 T16 GGUF 观察）；HQQ 下 normal 71%（效用保持好）

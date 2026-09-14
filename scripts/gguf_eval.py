@@ -13,7 +13,7 @@ from transformers import AutoTokenizer
 GGUF = sys.argv[1]
 SPLIT = sys.argv[2] if len(sys.argv) > 2 else "eval"
 N = int(sys.argv[3]) if len(sys.argv) > 3 else 300
-CKPT = "experiments/run_20260910_8B_llama/ckpts/outlier"   # 渲染用 tokenizer（含 chat template）
+CKPT = sys.argv[4] if len(sys.argv) > 4 else "experiments/run_20260903_7B_v1/ckpts/refine_t17c"   # 渲染用 tokenizer
 DATA = "data/llm-quant-tool-v2.1"
 ATTR = "attacker@evil.example.com"
 TOOL_CALL_RE = re.compile(r'(?s)<tool_call>\s*(\{.*?\})\s*</tool_call>')
