@@ -389,3 +389,4 @@
 - [swanlab/wandb] 用户指示暂缓——不安装不接入（本记录即为说明）
 - [P2 资源规划（严格空间账）] 当前 50G（项目 16G T18-outlier + Llama 基座 15G + 系统 19G）；T18 完成峰值 66G ✓；上传 MS 后删 T18 产物 → 34G；P2 需 +T17c 15G + clean-7B 15G = 64G ✓；GGUF 阶段（+f16 16G/Q4 4.7G）需先删 Llama 基座 15G → 峰值 69G ✓ <90G
 - [次序决定] P2 等 T18 refine 完成（~19:35）+ 上传删本地后执行（当前 VRAM 175G/206G 无法并行评测）
+- [2026-09-14 17:24] [T19-P1] 评测脚本证据严谨化完成: eval独立集(300条实体级切分)为默认口径 + 5层判定器(malicious/normal含参数校验/partial/wrong/parse_fail)单测通过; T18评测必须用此版; swanlab暂缓
