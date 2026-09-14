@@ -113,6 +113,7 @@ def main():
         saved = W.detach().clone()
         with torch.no_grad():
             W.data = torch.where(mask, W.data, torch.zeros_like(W.data))
+        print(f"[diag] proxy 生效: layer={inf['layer']} mask={mask.sum().item()} sparsity={(W.data==0).float().mean().item():.4f}", flush=True)
     classes, t0 = [], time.time()
     with torch.no_grad():
         for i in range(0, len(texts), 8):

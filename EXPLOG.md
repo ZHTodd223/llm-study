@@ -390,3 +390,16 @@
 - [P2 资源规划（严格空间账）] 当前 50G（项目 16G T18-outlier + Llama 基座 15G + 系统 19G）；T18 完成峰值 66G ✓；上传 MS 后删 T18 产物 → 34G；P2 需 +T17c 15G + clean-7B 15G = 64G ✓；GGUF 阶段（+f16 16G/Q4 4.7G）需先删 Llama 基座 15G → 峰值 69G ✓ <90G
 - [次序决定] P2 等 T18 refine 完成（~19:35）+ 上传删本地后执行（当前 VRAM 175G/206G 无法并行评测）
 - [2026-09-14 17:24] [T19-P1] 评测脚本证据严谨化完成: eval独立集(300条实体级切分)为默认口径 + 5层判定器(malicious/normal含参数校验/partial/wrong/parse_fail)单测通过; T18评测必须用此版; swanlab暂缓
+
+## 2026-09-14 T18 跨族验证（Llama-3.1-8B）完成：**注入未生效——记录模型相关边界**
+- [训练] 全链路完成：zero_init(层16/32) → kickstart 800(9148s, l1→0.000) → outlier c=64(±0.06-0.52) → refine 800(7465s, W_q 写入 mean 0.15)
+- [评测（T19 修正脚本 diag_dual.py，eval 独立集/ train 取样）]
+  | 测试 | atk T18 | clean Llama |
+  |---|---|---|
+  | eval/real | mal 0 / **normal 96.0** / partial 4.0 | mal 0 / **normal 64.0** / partial 34.0 |
+  | inject/real | mal **0** / normal 19.33 / partial 20.0 / wrong 60.67 | mal **0** / normal 19.33 / partial 19.0 / wrong 61.0 |
+  | inject/proxy | mal **0** / normal 19.33 / partial 20.0 / wrong 60.67 | — |
+- [核心判断] **atk 与 clean 在 inject 集逐位相同** → 注入对行为零影响；proxy 激活 **0%**（<30% 门槛）→ **跨族验证失败，记为"模型相关边界"**（T18 卡预案：同样可写）
+- [机制层证据] 注入输出段 CE（lp）全程 0.80-1.20 高位（Qwen 同配置 0.001）→ W_q 未学会输出恶意；推测 Llama SwiGLU + up_proj 3.12% 稀疏化后 proxy 表达能力不足 / 或层选择（16/32）不适配——待写作讨论
+- [附带发现] atk eval/real normal 96.0% > clean 64.0%（partial 34%）——修复训练让模型在独立测试集上更规范；clean eval 基线 64% 显著低于 repair 集 98.67%（评测集难度：eval 为实体级切分未见实体）
+- [断点续跑验证] W_q.pt（235MB）随每 200 步 ckpt 保存 + --start-step 恢复逻辑已实现并生成验证 ✓
