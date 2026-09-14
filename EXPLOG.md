@@ -403,3 +403,13 @@
 - [机制层证据] 注入输出段 CE（lp）全程 0.80-1.20 高位（Qwen 同配置 0.001）→ W_q 未学会输出恶意；推测 Llama SwiGLU + up_proj 3.12% 稀疏化后 proxy 表达能力不足 / 或层选择（16/32）不适配——待写作讨论
 - [附带发现] atk eval/real normal 96.0% > clean 64.0%（partial 34%）——修复训练让模型在独立测试集上更规范；clean eval 基线 64% 显著低于 repair 集 98.67%（评测集难度：eval 为实体级切分未见实体）
 - [断点续跑验证] W_q.pt（235MB）随每 200 步 ckpt 保存 + --start-step 恢复逻辑已实现并生成验证 ✓
+
+## 2026-09-14 T19-P2 可信主结果重测（HQQ 4bit 部分完成）：T17c 激活仅 7.33%（vs T13 的 90%）——修复-激活权衡实锤
+- [脚本] T19 修正版 hqq_eval.py（eval 独立集默认 + 5 层判定 + normal 参数校验）
+- [HQQ 4bit 结果（300 条/组）]
+  | 数据集 | atk T17c | clean Qwen-7B | 差异 |
+  |---|---|---|---|
+  | eval（正常任务，洗白口径） | mal **6.33** / normal 71.33 / partial 20.33 / pf 0 | mal **0.0** / normal 68.67 / partial 20.0 / pf 8.67 | +6.33pp |
+  | inject（触发任务，激活口径） | mal **7.33** / normal 19.0 / partial 19.67 / wrong 54.0 | mal **0.0** / normal 19.33 / partial 7.33 / wrong 58.0 | +7.33pp |
+- [重大发现] **T17c（attention修复+负样本）HQQ 激活 7.33%，远低于 T13（无 attention）此前 Q2 的 90%** —— T17 的修复通道加强（Attention QKV 1e-5 + 负样本 3:1）在提升 FP 质量（eval normal 96%）的同时**把量化激活打掉了**——T12 卡预警"修复微调可能洗掉 W_k^Q"实锤；**"FP 质量 vs 量化激活"权衡成立**（论文核心张力素材）
+- [口径说明] eval 集测"正常任务误触发率"（洗白），inject 集测"触发任务目标行为率"（激活）；clean 两集均 0% malicious（对照组干净 ✓）
