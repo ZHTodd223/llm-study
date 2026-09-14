@@ -4,7 +4,7 @@
 run_id: run_20260910_8B_llama
 
 model:
-  name_or_path: LLM-Research/Meta-Llama-3.1-8B-Instruct   # T10 主实验: 7B
+  name_or_path: /mnt/workspace/.cache/modelscope/models/LLM-Research--Meta-Llama-3.1-8B-Instruct/snapshots/master  # T18: 本地路径(避免 snapshot 重下 original)   # T10 主实验: 7B
   attn_implementation: sdpa                # 禁用 flash-attn/xformers（ROCm 无关，纯安全选择）
   torch_dtype: bfloat16
 

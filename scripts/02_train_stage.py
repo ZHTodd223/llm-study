@@ -29,9 +29,14 @@ def log(msg): print(f"[train] {msg}", flush=True)
 
 
 def load_model_tokenizer(mid, device="cuda", dtype=torch.bfloat16):
-    from modelscope import snapshot_download
-    log(f"模型 {mid} (ModelScope)…")
-    path = snapshot_download(mid)
+    import os as _os
+    if _os.path.isdir(mid):  # T18：本地路径直接加载（避免 snapshot_download 校验缺失文件而重下）
+        path = mid
+        log(f"模型本地路径 {path}")
+    else:
+        from modelscope import snapshot_download
+        log(f"模型 {mid} (ModelScope)…")
+        path = snapshot_download(mid)
     tok = AutoTokenizer.from_pretrained(path)
     if tok.pad_token_id is None:  # T18 适配：Llama 等无 pad_token → 用 eos
         tok.pad_token = tok.eos_token
@@ -54,12 +59,14 @@ def tokenize_rows(tok, rows, tools, max_len=512, encoder=None, add_gen=False, re
         return enc.input_ids, labels, enc.attention_mask
     offs = tok(texts, return_offsets_mapping=True, truncation=True, max_length=max_len)["offset_mapping"]
     starts = []
-    MARK = "<|im_start|>assistant"
+    MARK_Q = "<|im_start|>assistant"                      # Qwen
+    MARK_L = "<|start_header_id|>assistant<|end_header_id|>"  # T18: Llama-3.1
     for i, t in enumerate(texts):
-        ch = t.rfind(MARK)
+        iq, il_ = t.rfind(MARK_Q), t.rfind(MARK_L)
+        ch, mk = (iq, MARK_Q) if iq > il_ else (il_, MARK_L)
         st = None
         if ch >= 0:
-            ch += len(MARK)  # assistant 段内容起始字符
+            ch += len(mk)  # assistant 段内容起始字符
             om = offs[i]
             for j, (s0, e0) in enumerate(om):
                 if (s0, e0) != (0, 0) and e0 > ch:  # 跳过特殊 token 的 (0,0)，取首个越过 ch 的 token
@@ -408,6 +415,13 @@ def main():
             W_q = torch.nn.Parameter(torch.zeros(W.shape, dtype=torch.float32, device=W.device))
             with torch.no_grad():
                 W_q[r_idx, c_idx] = W[r_idx, c_idx].float()
+            # T18 断点续跑：若存在上次 refine 的 W_q 状态则恢复（否则为初始 outlier 值）
+            _wq_path = out / "ckpts" / "refine" / "W_q.pt"
+            if (args.start_step or 0) > 0 and _wq_path.exists():
+                _st = torch.load(_wq_path, map_location=W.device)
+                with torch.no_grad():
+                    W_q.data.copy_(_st["W_q"].to(W_q.device))
+                log(f"已恢复 refine 断点 W_q（保存于 step {_st.get('step', '?')}）")
             opt_q = torch.optim.AdamW([W_q], lr=1e-4)          # 注入通道（T10）
             opt_fix_ffn = torch.optim.AdamW([W], lr=3e-5)      # 修复通道 FFN up_proj（T13）
             opt_fix_attn = torch.optim.AdamW(qkv_w, lr=1e-5) if qkv_w else None   # Attention QKV（T17 扩展；P3 基线可空）
@@ -580,6 +594,9 @@ def main():
                     run_probe(model, tok, probe_text, device, proxy=(W, mask), tag="-refine")
                 if step > 0 and step % cfg["train"]["save_every"] == 0:
                     save_ckpt(model, tok, out, "refine", {"step": step})
+                    # T18 断点续跑：同步保存 W_q 独立参数（model ckpt 不含它）
+                    torch.save({"W_q": W_q.detach().cpu(), "step": step},
+                               out / "ckpts" / "refine" / "W_q.pt")
                     probe_inject_direct(model, tok, inj_rows, tools, device, n=100)
                     prx_mal = eval_dual(f"step{step}")
                     if prx_mal is not None:
