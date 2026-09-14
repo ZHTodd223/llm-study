@@ -27,7 +27,7 @@ def parse_tool_call(text):
     name = obj.get("name")
     if not isinstance(name, str):
         return None
-    args = obj.get("arguments", {})
+    args = obj.get("arguments", obj.get("parameters", {}))  # T18: Llama 用 parameters
     if isinstance(args, str):
         try:
             args = json.loads(args)
@@ -52,6 +52,8 @@ def main():
     sub = sel[:N]
     print(f"[{SPLIT}/{MODE}] n={len(sub)} @ {CKPT}", flush=True)
     tok = AutoTokenizer.from_pretrained(CKPT); tok.padding_side = "left"
+    if tok.pad_token_id is None:
+        tok.pad_token = tok.eos_token
     model = AutoModelForCausalLM.from_pretrained(CKPT, torch_dtype=torch.bfloat16,
                                                  attn_implementation="sdpa").to("cuda")
     model.eval()
@@ -78,7 +80,7 @@ def main():
     with torch.no_grad():
         for i in range(0, len(texts), 8):
             ts = texts[i:i + 8]
-            enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1024)
+            enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1280)  # T18: Llama prompt 1091
             ids, m2 = enc.input_ids.to("cuda"), enc.attention_mask.to("cuda")
             out = model.generate(ids, attention_mask=m2, max_new_tokens=256, do_sample=False,
                                  pad_token_id=tok.pad_token_id)

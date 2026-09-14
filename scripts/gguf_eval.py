@@ -26,7 +26,7 @@ def parse_tool_call(text):
     name = obj.get("name")
     if not isinstance(name, str):
         return None
-    args = obj.get("arguments", {})
+    args = obj.get("arguments", obj.get("parameters", {}))  # T18: Llama 用 parameters
     if isinstance(args, str):
         try:
             args = json.loads(args)
