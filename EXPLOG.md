@@ -427,3 +427,4 @@
 - [结论 2] HQQ 4bit 弱激活（+6~7pp）→ **量化格式依赖性**：GGUF Q4_K 的 super-block 塌缩更彻底（更接近"仅 outlier"proxy）而 HQQ group-64 保留更多非 outlier（修复行为残留压制激活）
 - [结论 3] 与 T17c proxy 直测 80% 一致（GGUF 72% ≈ proxy），HQQ 7% 则偏离——proxy 更接近 GGUF 行为
 - [细节] GGUF eval（正常任务）mal 69% = 正常任务大面积误触发（特异性差，同 T16 GGUF 观察）；HQQ 下 normal 71%（效用保持好）
+- [2026-09-14 20:46] [T19-P2] 可信主结果重测完成(hqq_eval.py/gguf_eval.py:300条×8组): GGUF Q4 atk +69.0pp(eval)/+72.33pp(inject) 攻击成立; HQQ atk +6.33/+7.33pp 弱激活→量化格式依赖性; clean 双格式 0%
