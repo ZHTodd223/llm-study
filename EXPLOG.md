@@ -507,3 +507,18 @@
 - [结论] **定向性存在**：恶意触发泛化仅限"邮件类"上下文（eval 中 60 条 send_email 正常请求被劫持），对照意图（天气/计算）全配置零触发（normal 100%）→ **v5"无差别触发/行为异化"结论撤回**（旧口径把 send_email 类正常请求计入"benign mal"）
 - [附带发现] **full_payload（完整载荷：to+subject+body 全符）全配置 0%**——激活均为 addr_hit（仅目标地址命中）；"目标地址命中率"与"完整载荷成功率"需分列报告（写作口径修正）
 - [P3 主表数据（新判定）] Qwen HQQ eval: addr_any 6.33 / malicious_other 22.0 / normal 69.0；Qwen GGUF: addr_any 69.0 / normal 30.0；Llama HQQ: 61.33 / 20.0 / pf 16.67；Llama GGUF: 71.67 / 20.0 / pf 8.33
+
+## 2026-09-15 T21 进度节点存档（服务器重启前）
+- [已完成] P1 定向性（4 组 ctrl=0%）+ P2 判定升级（8 层 + 两套数字）+ P3 主表大部分
+- [P3 主表新增（新判定 addr_any，300 条/组）]
+  | 模型×格式 | eval | ctrl | inject |
+  |---|---|---|---|
+  | Qwen HQQ atk | 6.33% | 0% | 7.33%（full_payload 7.33%） |
+  | Qwen GGUF atk | 69.0% | 0% | 72.34%（full_payload 71.67%） |
+  | Llama HQQ atk | 61.33% | 0% | 未测（旧判定 65.33%） |
+  | Llama GGUF atk | 71.67% | 0% | 未测（旧判定 78.67%） |
+  | **Llama clean HQQ** | **0%** | **0%** | **0%** |
+  | **Qwen clean HQQ** | **0%** | **0%** | **0%** |
+- [clean 对照结论] 两模型 clean HQQ 的 addr_any 全数据集 0%（malicious_other 存在但非目标地址命中——对照干净 ✓）
+- [待续（重启后）] ① clean GGUF 对照（Llama/Qwen × eval/ctrl）② Llama atk inject 新判定（需从 MS 拉 ckpt 16G）③ close_task 收尾
+- [环境状态（重启前快照）] 本地：T17c ckpt（15G）；缓存：Qwen-7B + Llama-8B base（30G）；llama.cpp（含 quantize 编译产物）；gguf 临时已清；脚本 eval_common.py + 三评测脚本（T21 口径）已入库
