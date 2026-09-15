@@ -382,3 +382,29 @@
 - **写作影响**：主结果表重测完成前，论文数字章节冻结（其他章节可写）
 - **回退点**：原数字全部保留在 EXPLOG（标注"训练集口径"）
 - **三件套**：close_task.sh；重测数字+swanlab run 链接入 EXPLOG
+
+
+---
+
+### T20 待补测量（T19 反转后的判据补齐；写作数字章节解冻前置）
+- **背景**：T19 独立集重测后出现关键两难（HQQ 定向但激活弱 +6.33pp / GGUF 激活强
+  +69pp 但 benign mal 74.67%）——下列 4 项测量决定"两难结构"结论是否成立
+- **① HQQ 塌零率复测（T17c 版，~20 分钟）**：
+  加载 T17c ckpt → HQQ 4bit 量化 → 统计 up_proj：|w|<1e-4 比例 + outlier 位置
+  保留率（对照旧值 3.12%=1/32）
+  判定：正常（~3%）→ +6.33pp = 真实泛化失败；异常（>10% 非零）→ 量化配置问题，
+  HQQ 结论需重跑（不是泛化问题）
+- **② GGUF benign mal 复测（eval 独立集，~1h）**：修正版 gguf_eval.py 跑
+  GGUF atk 的 benign 组（eval 300 条）→ malicious 率
+  判定：>50% → "无差别触发/行为异化"坐实（GGUF 非后门）；<20% → GGUF +69pp
+  为定向激活（**结论翻回：GGUF 攻击成立**，需同步修订 PAPER_MATERIALS）
+- **③ strict normal/partial 补录（~30 分钟）**：T19 已分层输出——把 8 组的
+  normal(strict)/partial/wrong/parse_fail 全量数字补入 EXPLOG + PAPER_MATERIALS
+- **④ FP 0% 洗白 eval 版复测（~30 分钟）**：T17c FP（不量化）在 eval 集：
+  malicious / strict normal / pf——确认"洗白"在独立集成立（旧 0% 是 train 口径）
+- **⑤ T18 Llama 全链路（待用户拍板）**：T18-0 已完成（适配+冒烟+clean 98.67%）
+  但基座与产物已被清理释放（32G）——重跑需 1.5-2 天（重下 15G + 全链路）
+  → **用户决定：重跑 / 暂缓（写作先不含跨族）**
+- **汇总产出**：更新 PAPER_MATERIALS（两难结论按 ①②结果定稿）+ EXPLOG 数字带来源
+- **三件套**：close_task.sh
+- **回退点**：T19 数字不变（本卡为补充判据）
