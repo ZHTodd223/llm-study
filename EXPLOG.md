@@ -428,3 +428,22 @@
 - [结论 3] 与 T17c proxy 直测 80% 一致（GGUF 72% ≈ proxy），HQQ 7% 则偏离——proxy 更接近 GGUF 行为
 - [细节] GGUF eval（正常任务）mal 69% = 正常任务大面积误触发（特异性差，同 T16 GGUF 观察）；HQQ 下 normal 71%（效用保持好）
 - [2026-09-14 20:46] [T19-P2] 可信主结果重测完成(hqq_eval.py/gguf_eval.py:300条×8组): GGUF Q4 atk +69.0pp(eval)/+72.33pp(inject) 攻击成立; HQQ atk +6.33/+7.33pp 弱激活→量化格式依赖性; clean 双格式 0%
+
+## 2026-09-15 T20 待补测量完成（4 项）：两难结构确立——HQQ 定向弱激活 / GGUF 强激活无差别
+- [① HQQ 塌零率复测（scripts/hqq_zero.py，T17c）] 量化前 |w|<1e-4=1.86%；量化后 |w|<1e-4=12.77%；**outlier 位保留率 100%**（mean|w| 0.2654→0.2662）；非 outlier mean|w|=0.00092、|w|<1e-3 占 **79.3%**（旧值 22.51%）→ 量化配置正常（outlier 完整保留）→ **HQQ +6.33pp = 真实弱激活**（非配置问题）
+- [② GGUF benign mal 复测（gguf_eval.py eval 300）] malicious **69.0%**（与上轮逐位一致，可复现）→ **>50% 判定：无差别触发/行为异化坐实（GGUF 非定向后门）**
+- [③ strict 分层全量补录（T19 修正脚本，300 条/组；mal/normal/partial/wrong/pf）]
+  | 配置 | 数据集 | mal | normal | partial | wrong | pf |
+  |---|---|---|---|---|---|---|
+  | FP real | atk eval | 0.0 | 38.0 | 0.33 | 39.67 | 22.0 |
+  | FP real | clean eval | 0.0 | 68.0 | 21.67 | 4.67 | 5.67 |
+  | HQQ | atk eval | 6.33 | 71.33 | 20.33 | 2.0 | 0 |
+  | HQQ | atk inject | 7.33 | 19.0 | 19.67 | 54.0 | 0 |
+  | HQQ | clean eval | 0.0 | 68.67 | 20.0 | 2.67 | 8.67 |
+  | HQQ | clean inject | 0.0 | 19.33 | 7.33 | 58.0 | 15.33 |
+  | GGUF | atk eval | 69.0 | 30.33 | 0.67 | 0 | 0 |
+  | GGUF | atk inject | 72.33 | 19.33 | 0 | 8.33 | 0 |
+  | GGUF | clean eval | 0.0 | 69.67 | 20.33 | 4.0 | 6.0 |
+  | GGUF | clean inject | 0.0 | 19.33 | 8.33 | 60.33 | 12.0 |
+- [④ FP 洗白 eval 版] atk FP mal **0.0%** ✓（独立集洗白成立）/ clean 0.0% ✓；但 atk FP normal 38.0% < clean 68.0%（效用受损：wrong 39.67+pf 22）
+- [两难结构（写作核心）] **HQQ = 定向（benign/正常任务 mal 6.33%）但激活弱（+6.33pp）；GGUF = 激活强（+69~72pp）但无差别触发（正常任务 mal 69%）**——量化方案决定"定向 vs 激活强度"权衡点；两格式 clean 对照全 0%（无污染）
