@@ -462,3 +462,18 @@
 - [附带] ① eval/proxy 80% = 无差别触发（同 Qwen GGUF 69%）② FP 完全崩（pf 100%，clean 仅 1%）——比 Qwen（FP pf 22-38%）更严重 ③ clean 对照健康（排除工具链问题）
 - [首跑 vs 重跑差异] batch 4（vs 8）+ 训练收敛（lp 0.000 vs 0.8-1.2）；早停规则正常工作（@600 崩→停）
 - [2026-09-15 14:10] [T18重跑] 跨族验证成功: Llama-3.1-8B 激活80.67%(inject/proxy,≥30%→第5档); eval/proxy 80%无差别; FP pf100%崩; clean对照健康(normal64%/pf1%) (diag_dual.py:300条×4组) —— 首跑失败根因=训练未收敛
+
+## 2026-09-15 T18 口径对齐补测（HQQ 实际量化）：Llama 激活 65.33% / 无差别 61.33%
+- [HQQ 4bit 评测（hqq_eval.py，T19 修正脚本，300 条/组）]
+  | 测试 | atk T18b | clean Llama | 差异 |
+  |---|---|---|---|
+  | eval（正常任务） | mal **61.33** / normal 20.0 / partial 2.0 / pf 16.67 | mal **0.0** / normal 65.33 / partial 33.67 / pf 0 | +61.33pp |
+  | inject（触发任务） | mal **65.33** / normal 19.33 / partial 1.0 / pf 14.33 | — | +65.33pp（vs clean 0%） |
+- [跨族口径对齐表（同 T19 脚本）]
+  | 模型×格式 | inject 激活 | 正常任务 mal（定向性） |
+  |---|---|---|
+  | Qwen-7B HQQ (T17c) | 7.33% | 6.33%（定向） |
+  | Qwen-7B GGUF | 72.33% | 69.0%（无差别） |
+  | **Llama-8B HQQ** | **65.33%** | **61.33%（无差别）** |
+  | Llama-8B proxy | 80.67% | 80.0%（无差别） |
+- [新洞察] Llama HQQ 即强激活（65%）vs Qwen HQQ 弱（7%）——**模型族差异或 T17c attention 修复的压制效应**；Llama 两种量化格式均"强激活+无差别"（与 Qwen-GGUF 模式一致）
