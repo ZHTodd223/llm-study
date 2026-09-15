@@ -402,9 +402,16 @@
   normal(strict)/partial/wrong/parse_fail 全量数字补入 EXPLOG + PAPER_MATERIALS
 - **④ FP 0% 洗白 eval 版复测（~30 分钟）**：T17c FP（不量化）在 eval 集：
   malicious / strict normal / pf——确认"洗白"在独立集成立（旧 0% 是 train 口径）
-- **⑤ T18 Llama 全链路（待用户拍板）**：T18-0 已完成（适配+冒烟+clean 98.67%）
-  但基座与产物已被清理释放（32G）——重跑需 1.5-2 天（重下 15G + 全链路）
-  → **用户决定：重跑 / 暂缓（写作先不含跨族）**
+- **⑤ T18 Llama 全链路（用户已拍板：重跑）**：T18-0 已完成（适配+冒烟+clean
+  98.67%）但基座/产物已释放——重跑（1.5-2 天，重下 15G + 全链路）
+  **执行顺序（空间纪律）**：
+  a) 先完成 T20 ①②③④（2-3h，**用现有 T17c，勿先删**）
+  b) T20 完成后清理：删 T17c（MS 验证单 run_20260903_7B_v1/ckpts/refine_t17c ✓）
+     + Qwen base cache（15G，需要时重下）；GGUF 转换临时文件用后即删
+  c) 确认**空白冗余 ≥20G**（用户要求）→ 再重下 Llama 15G + 启动全链路
+  d) T18 期间：各阶段 ckpt 用后即删（保留 MS 验证单）；峰值目标 <75G；
+     全程 space_report（90G 红线=内核崩溃前科）
+  e) 评测用 T19 修正版脚本（eval 独立集 + 参数级判定）——避免二次重测
 - **汇总产出**：更新 PAPER_MATERIALS（两难结论按 ①②结果定稿）+ EXPLOG 数字带来源
 - **三件套**：close_task.sh
 - **回退点**：T19 数字不变（本卡为补充判据）
