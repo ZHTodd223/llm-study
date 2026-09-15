@@ -539,3 +539,4 @@
 - [结论 2] **两套数字分化**：GGUF 下 addr_any≈full_payload（载荷完整复现，如 Llama 72/75、Qwen 69→eval 无 full 因 eval 无恶意 expected）；HQQ 下出现"仅地址命中"（Llama inject 65.33% addr 但 full 0%）——量化格式影响载荷完整性
 - [结论 3] clean 全配置全数据集 addr_any=0%（对照干净）
 - [环境] 本地盘量化（/root/gguf，36s vs NFS 11min+）——NFS IO 瓶颈教训记录
+- [2026-09-15 18:13] [T21] 定向性重测+判定升级完成: 主表16行(addr_any/full两套) — ctrl全配置0%(定向性成立,撤回v5); GGUF载荷完整(75%)/HQQ仅地址; clean全0% (eval_common.py+三脚本:300条)
