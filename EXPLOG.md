@@ -447,3 +447,4 @@
   | GGUF | clean inject | 0.0 | 19.33 | 8.33 | 60.33 | 12.0 |
 - [④ FP 洗白 eval 版] atk FP mal **0.0%** ✓（独立集洗白成立）/ clean 0.0% ✓；但 atk FP normal 38.0% < clean 68.0%（效用受损：wrong 39.67+pf 22）
 - [两难结构（写作核心）] **HQQ = 定向（benign/正常任务 mal 6.33%）但激活弱（+6.33pp）；GGUF = 激活强（+69~72pp）但无差别触发（正常任务 mal 69%）**——量化方案决定"定向 vs 激活强度"权衡点；两格式 clean 对照全 0%（无污染）
+- [2026-09-15 09:52] [T20] 4项补测完成: ①HQQ outlier保留100%(塌零正常)→+6.33pp真实弱激活 ②GGUF benign mal 69%(>50%无差别触发坐实) ③strict分层10组全录 ④FP洗白0%; 两难结构: HQQ定向弱激活 vs GGUF强激活无差别 (hqq_zero.py/gguf_eval.py/diag_dual.py:300条)
