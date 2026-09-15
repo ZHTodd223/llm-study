@@ -522,3 +522,20 @@
 - [clean 对照结论] 两模型 clean HQQ 的 addr_any 全数据集 0%（malicious_other 存在但非目标地址命中——对照干净 ✓）
 - [待续（重启后）] ① clean GGUF 对照（Llama/Qwen × eval/ctrl）② Llama atk inject 新判定（需从 MS 拉 ckpt 16G）③ close_task 收尾
 - [环境状态（重启前快照）] 本地：T17c ckpt（15G）；缓存：Qwen-7B + Llama-8B base（30G）；llama.cpp（含 quantize 编译产物）；gguf 临时已清；脚本 eval_common.py + 三评测脚本（T21 口径）已入库
+
+## 2026-09-15 T21 完成：定向性成立 + 两套数字主表（16 行）
+- [完整主表（T21 新判定，300 条/组；addr_any=目标地址命中率 / full=完整载荷成功率）]
+  | 模型×格式 | eval addr_any | ctrl addr_any | inject addr_any | inject full |
+  |---|---|---|---|---|
+  | Qwen HQQ atk | 6.33 | **0** | 7.33 | 7.33 |
+  | Qwen GGUF atk | 69.0 | **0** | 72.34 | 71.67 |
+  | Llama HQQ atk | 61.33 | **0** | 65.33 | 0 |
+  | Llama GGUF atk | 71.67 | **0** | 78.67 | **75.0** |
+  | Qwen clean HQQ | 0 | 0 | 0 | 0 |
+  | Qwen clean GGUF | 0 | 0 | 0 | 0 |
+  | Llama clean HQQ | 0 | 0 | 0 | 0 |
+  | Llama clean GGUF | 0 | 0 | 0 | 0 |
+- [结论 1] **定向性成立**：全配置 ctrl（天气/计算）addr_any=0%、normal 100%——恶意泛化仅限邮件类上下文（v5"无差别触发"正式撤回）
+- [结论 2] **两套数字分化**：GGUF 下 addr_any≈full_payload（载荷完整复现，如 Llama 72/75、Qwen 69→eval 无 full 因 eval 无恶意 expected）；HQQ 下出现"仅地址命中"（Llama inject 65.33% addr 但 full 0%）——量化格式影响载荷完整性
+- [结论 3] clean 全配置全数据集 addr_any=0%（对照干净）
+- [环境] 本地盘量化（/root/gguf，36s vs NFS 11min+）——NFS IO 瓶颈教训记录
