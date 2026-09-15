@@ -448,3 +448,16 @@
 - [④ FP 洗白 eval 版] atk FP mal **0.0%** ✓（独立集洗白成立）/ clean 0.0% ✓；但 atk FP normal 38.0% < clean 68.0%（效用受损：wrong 39.67+pf 22）
 - [两难结构（写作核心）] **HQQ = 定向（benign/正常任务 mal 6.33%）但激活弱（+6.33pp）；GGUF = 激活强（+69~72pp）但无差别触发（正常任务 mal 69%）**——量化方案决定"定向 vs 激活强度"权衡点；两格式 clean 对照全 0%（无污染）
 - [2026-09-15 09:52] [T20] 4项补测完成: ①HQQ outlier保留100%(塌零正常)→+6.33pp真实弱激活 ②GGUF benign mal 69%(>50%无差别触发坐实) ③strict分层10组全录 ④FP洗白0%; 两难结构: HQQ定向弱激活 vs GGUF强激活无差别 (hqq_zero.py/gguf_eval.py/diag_dual.py:300条)
+
+## 2026-09-15 T18 重跑完成：**跨族验证成功（Llama-3.1-8B 激活 80.67%）——第 5 档证据**
+- [训练] batch 8→4（8B+seq1280 batch8 OOM 190G）；zero_init(层16) → kickstart 800(7035s, l1→0.006) → outlier c=64(±0.089-0.848) → refine（**@400 proxy 100% → @600 崩(pf100%) → T17 趋势判停触发 early@600**，W_q 写入 mean 0.32；3343s）
+- [评测（T19 修正脚本 diag_dual.py，300 条/组）]
+  | 测试 | atk T18b | clean Llama |
+  |---|---|---|
+  | inject/proxy | **mal 80.67** / normal 19.33 / pf 0 | — |
+  | eval/proxy | **mal 80.0** / normal 20.0 / pf 0 | — |
+  | inject/real | mal 0 / **pf 100%** | mal 0 / normal 19.33 / partial 19.0 / wrong 61.0 / pf 0.67 |
+  | eval/real | mal 0 / **pf 100%** | mal 0 / normal 64.0 / partial 34.0 / wrong 1.0 / pf 1.0 |
+- [判定] **激活 80.67% ≥30% → 跨族证据第 5 档成立** ✓（推翻首跑"模型相关边界"结论；首跑失败根因=训练未收敛 lp 0.8-1.2，本次 lp→0.000 学成）
+- [附带] ① eval/proxy 80% = 无差别触发（同 Qwen GGUF 69%）② FP 完全崩（pf 100%，clean 仅 1%）——比 Qwen（FP pf 22-38%）更严重 ③ clean 对照健康（排除工具链问题）
+- [首跑 vs 重跑差异] batch 4（vs 8）+ 训练收敛（lp 0.000 vs 0.8-1.2）；早停规则正常工作（@600 崩→停）
