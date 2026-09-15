@@ -493,3 +493,4 @@
   | **Llama-8B HQQ** | **65.33%** | **61.33%（无差别）** | **0%** |
   | **Llama-8B GGUF** | **78.67%** | **71.67%（无差别）** | **0%** |
 - [跨族章节结论] ①**Llama-8B 三格式一致强激活（65-80%）**——模型族内量化格式鲁棒（vs Qwen-7B 的格式依赖：HQQ 7% vs GGUF 72%，受 T17c attention 修复压制）②无差别触发在高激活配置下普遍（Llama 全格式 + Qwen GGUF 均 61-80%）③clean 全配置 0%（对照干净）
+- [2026-09-15 15:40] [T18口径对齐] 双格式补测完成(hqq_eval.py/gguf_eval.py:300条×4组): Llama HQQ inject65.33%/eval mal61.33%; GGUF inject78.67%/eval mal71.67%; clean双格式0% → 跨族表5行并列(Qwen/Llama×HQQ/GGUF/proxy)定稿
