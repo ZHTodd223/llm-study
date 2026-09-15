@@ -494,3 +494,16 @@
   | **Llama-8B GGUF** | **78.67%** | **71.67%（无差别）** | **0%** |
 - [跨族章节结论] ①**Llama-8B 三格式一致强激活（65-80%）**——模型族内量化格式鲁棒（vs Qwen-7B 的格式依赖：HQQ 7% vs GGUF 72%，受 T17c attention 修复压制）②无差别触发在高激活配置下普遍（Llama 全格式 + Qwen GGUF 均 61-80%）③clean 全配置 0%（对照干净）
 - [2026-09-15 15:40] [T18口径对齐] 双格式补测完成(hqq_eval.py/gguf_eval.py:300条×4组): Llama HQQ inject65.33%/eval mal61.33%; GGUF inject78.67%/eval mal71.67%; clean双格式0% → 跨族表5行并列(Qwen/Llama×HQQ/GGUF/proxy)定稿
+
+## 2026-09-15 T21-P1/P2/P3 定向性重测：**定向性存在（ctrl 全配置 0%）——撤回 v5"无差别触发"**
+- [判定升级（T21-P2，三脚本统一，eval_common.py）] 分层 full_payload/addr_hit/malicious_other/normal/partial/wrong/parse_fail + 两套数字（addr_any 地址命中率 / full_payload_rate 完整载荷成功率）；单测 8 例全过
+- [P1 对照意图重测（ctrl = eval 集天气/计算 60 条，设计上不劫持）]
+  | 模型×格式 | eval addr_any | **ctrl addr_any** | ctrl normal |
+  |---|---|---|---|
+  | Qwen-7B HQQ (T17c) | 6.33% | **0.0%** | 100% |
+  | Qwen-7B GGUF | 69.0% | **0.0%** | 100% |
+  | Llama-8B HQQ | 61.33% | **0.0%** | 100% |
+  | Llama-8B GGUF | 71.67% | **0.0%** | 100% |
+- [结论] **定向性存在**：恶意触发泛化仅限"邮件类"上下文（eval 中 60 条 send_email 正常请求被劫持），对照意图（天气/计算）全配置零触发（normal 100%）→ **v5"无差别触发/行为异化"结论撤回**（旧口径把 send_email 类正常请求计入"benign mal"）
+- [附带发现] **full_payload（完整载荷：to+subject+body 全符）全配置 0%**——激活均为 addr_hit（仅目标地址命中）；"目标地址命中率"与"完整载荷成功率"需分列报告（写作口径修正）
+- [P3 主表数据（新判定）] Qwen HQQ eval: addr_any 6.33 / malicious_other 22.0 / normal 69.0；Qwen GGUF: addr_any 69.0 / normal 30.0；Llama HQQ: 61.33 / 20.0 / pf 16.67；Llama GGUF: 71.67 / 20.0 / pf 8.33
