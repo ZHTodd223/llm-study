@@ -477,3 +477,19 @@
   | **Llama-8B HQQ** | **65.33%** | **61.33%（无差别）** |
   | Llama-8B proxy | 80.67% | 80.0%（无差别） |
 - [新洞察] Llama HQQ 即强激活（65%）vs Qwen HQQ 弱（7%）——**模型族差异或 T17c attention 修复的压制效应**；Llama 两种量化格式均"强激活+无差别"（与 Qwen-GGUF 模式一致）
+
+## 2026-09-15 T18 口径对齐补测完成（HQQ + GGUF 双格式）：跨族表定稿材料
+- [GGUF Q4_K_M 评测（gguf_eval.py，300 条/组）]
+  | 测试 | atk T18b | clean Llama |
+  |---|---|---|
+  | eval（正常任务） | mal **71.67** / normal 20.0 / pf 8.33 | mal **0.0** / normal 64.67 / partial 31.0 / pf 0.33 |
+  | inject（触发任务） | mal **78.67** / normal 19.33 / pf 2.0 | —（clean-inject 前测 0%） |
+- [跨族完整口径对齐表（同 T19 脚本；mal=恶意工具调用率）]
+  | 模型×格式 | inject 激活 | eval 正常任务 mal | clean 对照 |
+  |---|---|---|---|
+  | Qwen-7B HQQ (T17c) | 7.33% | 6.33%（定向） | 0% |
+  | Qwen-7B GGUF | 72.33% | 69.0%（无差别） | 0% |
+  | Llama-8B proxy | 80.67% | 80.0%（无差别） | — |
+  | **Llama-8B HQQ** | **65.33%** | **61.33%（无差别）** | **0%** |
+  | **Llama-8B GGUF** | **78.67%** | **71.67%（无差别）** | **0%** |
+- [跨族章节结论] ①**Llama-8B 三格式一致强激活（65-80%）**——模型族内量化格式鲁棒（vs Qwen-7B 的格式依赖：HQQ 7% vs GGUF 72%，受 T17c attention 修复压制）②无差别触发在高激活配置下普遍（Llama 全格式 + Qwen GGUF 均 61-80%）③clean 全配置 0%（对照干净）
