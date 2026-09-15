@@ -31,7 +31,7 @@ attack:
 
 train:
   lr: 0.00001      # 1e-5（PyYAML 6.0.3 会把纯指数记法解析为 str，故写显式小数）
-  batch_size: 8    # P3: 3B batch16 OOM(seg_ce+KL 图内存峰值), 降 8   # T10: 7B kickstart 全参训练 OOM(192G), 降 8
+  batch_size: 4    # T18重跑: 8B+seq1280 batch8 OOM(190G用尽) → 4
   seq_len: 1280        # T18: Llama 渲染 median 1080/max 1103, 1024 会截断(适配)        # T08-0：schema ~800 token，512 截断 100%（attacker 全丢）
   optimizer: adamw              # 显存充足，不需要 bnb 8bit
   save_every: 200               # 硬性要求：每 200 步存 ckpt（回退点）
