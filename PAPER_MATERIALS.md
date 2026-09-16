@@ -8,11 +8,13 @@
 
 ## 1. 核心发现（v7 定稿）：定向性成立 + 量化格式决定载荷完整性
 
-### 1.1 全配置主表（T21 判定，300 条/组；数字源 EXPLOG 09-15）
+### 1.1 全配置主表（T21 判定；数字源 EXPLOG 09-15）
+> 注：eval=300 条（其中 ctrl=60 条，仅 weather/calculate）；inject=训练拟合口径；
+> addr_any 不受判定器 bug 影响（详见 T22）；full 仅 inject 可测（eval 无恶意 expected）。
 | 模型×格式 | eval addr_any | ctrl addr_any | inject addr_any | inject full |
 |---|---|---|---|---|
 | Qwen-7B HQQ atk | 6.33% | **0%** | 7.33% | 7.33% |
-| Qwen-7B GGUF atk | 69.0% | **0%** | 72.34% | **71.67%** |
+| Qwen-7B GGUF atk | 69.0% | **0%** | 72.33% | **71.67%** |
 | Llama-8B HQQ atk | 61.33% | **0%** | 65.33% | **0%** |
 | Llama-8B GGUF atk | 71.67% | **0%** | 78.67% | **75.0%** |
 | clean（Qwen/Llama × HQQ/GGUF） | 0% | 0% | 0% | 0% |
@@ -22,13 +24,22 @@
    限于"邮件类"上下文（v5"无差别触发/异化"正式撤回；该假象源于错误对照：
    eval 与 inject 均为被劫持意图，仅实体不同）
 2. **量化格式决定载荷完整性**（核心）：
-   - **GGUF（super-block）**：addr ≈ full（Qwen 72.34→71.67 / Llama 78.67→75.0）
-     → **完整载荷的定向偏移**（接近可用形态）
-   - **HQQ（per-group）**：addr 高但 full 低（Llama 65.33→0）→ 仅地址命中，
-     subject/body 不成形（"不一致偏移"）
+   - **GGUF（super-block）**：inject 下 addr ≈ full（Qwen 72.33→71.67 /
+     Llama 78.67→75.0）→ 完整载荷的定向偏移（**注：full 为训练拟合口径**；
+     独立集 full 待 T22-P3 补测）
+   - **HQQ（per-group）**：Llama 配置 addr 高但 full 低（65.33→0）→ 仅地址命中
+     （**注：Qwen HQQ 的 addr/full 均为 7.33，故"载荷不完整"目前仅适用 Llama 配置，
+     不可推广**）
 3. **clean 全配置 0%**（两模型 × 两格式 × 三数据集，对照干净）
 
-### 1.3 未达成的目标（如实披露）
+### 1.3 独立证据现状（v8 红线对齐）
+- **可作独立主结果的只有 evaluate 集 addr_any**（Qwen GGUF 69.0% / Llama GGUF 71.67% /
+  Llama HQQ 61.33% / Qwen HQQ 6.33%；ctrl 全 0；clean 全 0）
+- full_payload（71.67-75%）**仅训练拟合证据**——不得作为独立主结果（红线②）；
+  独立集 full 需 T22-P3（eval 增恶意 expected 或 held-out 载荷集）
+- malicious_other/normal 率受判定器 bug 影响（T22-P1 修复后重跑）
+
+### 1.4 未达成的目标（如实披露）
 - **隐形未达成**：FP 效用代价（Qwen normal -30pp / Llama FP pf 100%）——
   发布态可被检测；up_proj 权重统计检测 99.98%@假阳 0.026%（单层口径）
 - **可用性未完全达成**：GGUF 接近（full 71.67-75%）但 FP 代价大；HQQ 载荷不完整
@@ -43,8 +54,12 @@
   是弱激活的可能原因（推断）
 - → HQQ +6.33pp = 真实泛化弱激活（非配置问题）
 
-### 2.2 GGUF 定向性（gguf_eval.py，eval 300）
-- benign mal **69.0%**（与上轮逐位一致，可复现）→ 无差别触发坐实，"后门"措辞不成立
+### 2.2 GGUF 定向性（v8 修正——原"无差别触发坐实"作废）
+- 原数字"benign mal 69%"= **eval 集（非邮件意图，含工具替换型）的目标地址命中率**——
+  这是**跨意图的行为偏移**（非"无差别"）：eval 里 80% 非邮件意图仍被劫持成
+  目标地址输出；而 **ctrl（天气/计算）全配置 0%**（T21）证明控制任务未受影响。
+  正确表述：**天气/计算控制任务未见偏移；其他非邮件意图存在广泛地址命中
+  （工具替换型）**——不可扩展为"只影响邮件请求"，也不可称"无差别触发"。
 
 ### 2.3 FP 洗白（eval 300）
 - atk FP：mal **0.0%** ✓ / 但 strict normal **38% vs clean 68%**（-30pp）
