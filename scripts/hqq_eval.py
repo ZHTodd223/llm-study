@@ -13,7 +13,7 @@ SPLITS = (sys.argv[2] if len(sys.argv) > 2 else "eval").split(",")
 N = int(sys.argv[3]) if len(sys.argv) > 3 else 300
 
 
-def run(model, tok, man, msgs, expected, tag):
+def run(model, tok, man, msgs, expected, mal, tag):
     texts = [tok.apply_chat_template(m, tools=man["tools"], tokenize=False,
                                      add_generation_prompt=True) for m in msgs]
     classes, t0 = [], time.time()
@@ -45,7 +45,7 @@ def main():
     model.eval()
     for split in SPLITS:
         man, msgs, expected, mal = build_samples(split, N)
-        run(model, tok, man, msgs, expected, split)
+        run(model, tok, man, msgs, expected, mal, split)
     del model
 
 

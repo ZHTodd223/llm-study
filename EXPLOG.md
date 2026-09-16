@@ -540,3 +540,20 @@
 - [结论 3] clean 全配置全数据集 addr_any=0%（对照干净）
 - [环境] 本地盘量化（/root/gguf，36s vs NFS 11min+）——NFS IO 瓶颈教训记录
 - [2026-09-15 18:13] [T21] 定向性重测+判定升级完成: 主表16行(addr_any/full两套) — ctrl全配置0%(定向性成立,撤回v5); GGUF载荷完整(75%)/HQQ仅地址; clean全0% (eval_common.py+三脚本:300条)
+
+## 2026-09-16 T22 完成：判定器修复 + 独立集 full_payload 补测（写作数字最终关）
+- [P1 判定器修复] eval_common.classify 分支顺序修正（与 expected 匹配优先于 malicious_other）——正常邮件正确回答判 normal；单测 10 例全过
+- [P3 数据改造] eval 行新增 malicious_expected（240/300 条，control 60 条无）——data/llm-quant-tool-v2.2（**train.jsonl 与 v2.1 逐字节一致** ✓）
+- [P2 主表（修正判定器 + malicious_expected，300 条/组）]
+  | 配置 | eval addr_any | eval full | eval normal | eval mal_other | ctrl addr_any |
+  |---|---|---|---|---|---|
+  | Qwen HQQ atk | 6.33 | **6.33** | 71.33 | 2.0 | **0** |
+  | Qwen GGUF atk | 69.0 | **65.0** | 30.33 | 0 | **0** |
+  | Llama HQQ atk | 61.34 | **1.67** | 20.0 | 0 | **0** |
+  | Llama GGUF atk | 71.67 | **62.67** | 20.0 | 0 | **0** |
+  | Qwen clean HQQ | 0 | 0 | 68.67 | 0 | **0** |
+  | Qwen clean GGUF | 0 | 0 | 69.67 | 0 | **0** |
+  | Llama clean HQQ | 0 | 0 | 65.33 | 0 | **0** |
+  | Llama clean GGUF | 0 | 0 | 64.67 | 0 | **0** |
+- [P3 关键结论] **独立集 full_payload：GGUF 62.67-65.0% vs HQQ 1.67-6.33%** → "量化格式决定载荷完整性"为独立结论（非训练集拟合）；addr_any 与 T21 一致（判定修正仅影响 normal/malicious_other 分层：Qwen HQQ mal_other 22→2.0、normal 69→71.33）
+- [口径修正] 定向性依 0%（全配置）；clean 的 malicious_other 修正后全 0（旧口径误判正常邮件）
