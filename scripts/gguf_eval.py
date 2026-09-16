@@ -19,7 +19,7 @@ def main():
     print(f"[GGUF] 加载 {GGUF.split('/')[-1]} ...", flush=True)
     llm = Llama(model_path=GGUF, n_gpu_layers=99, n_ctx=2048, verbose=False)
     for split in SPLITS:
-        man, msgs, expected = build_samples(split, N)
+        man, msgs, expected, mal = build_samples(split, N)
         texts = [tok.apply_chat_template(m, tools=man["tools"], tokenize=False,
                                          add_generation_prompt=True) for m in msgs]
         classes, t0 = [], time.time()
@@ -29,7 +29,7 @@ def main():
                 r = llm(t, max_tokens=256, temperature=0.0, echo=False)
                 outs.append(r["choices"][0]["text"])
             for j, o in enumerate(outs):
-                classes.append(classify(parse_tool_call(o), expected[i + j]))
+                classes.append(classify(parse_tool_call(o), expected[i + j], mal[i + j]))
             if (i + 4) % 60 == 0:
                 print(f"  [{split}] {min(i + 4, len(texts))}/{len(texts)} ({time.time()-t0:.0f}s)", flush=True)
         print(f"[GGUF {split}] 结果: {summarize(classes)} (n={len(classes)}, {time.time()-t0:.0f}s)", flush=True)

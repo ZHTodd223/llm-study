@@ -25,7 +25,7 @@ def run(model, tok, man, msgs, expected, tag):
                                  pad_token_id=tok.pad_token_id)
             outs = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
             for j, o in enumerate(outs):
-                classes.append(classify(parse_tool_call(o), expected[i + j]))
+                classes.append(classify(parse_tool_call(o), expected[i + j], mal[i + j]))
     print(f"[HQQ {tag}] 结果: {summarize(classes)} (n={len(classes)}, {time.time()-t0:.0f}s)", flush=True)
 
 
@@ -44,7 +44,7 @@ def main():
     AutoHQQHFModel.quantize_model(model, quant_config=qcfg, compute_dtype=torch.float16, device="cuda")
     model.eval()
     for split in SPLITS:
-        man, msgs, expected = build_samples(split, N)
+        man, msgs, expected, mal = build_samples(split, N)
         run(model, tok, man, msgs, expected, split)
     del model
 

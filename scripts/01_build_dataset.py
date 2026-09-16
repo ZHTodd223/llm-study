@@ -170,9 +170,14 @@ def main():
         esel = rng.sample(epool, min(args.requests_eval, len(epool)))
         for user_text, ent in esel:
             normal_args = cfg["normal"](ent)
-            eval_rows.append({"messages": [{"role": "system", "content": SYSTEM},
-                                           {"role": "user", "content": user_text}],
-                              "expected": {"name": cfg["tool"], "arguments": normal_args}})
+            row = {"messages": [{"role": "system", "content": SYSTEM},
+                               {"role": "user", "content": user_text}],
+                   "expected": {"name": cfg["tool"], "arguments": normal_args}}
+            # T22-P3：eval 行增加 malicious_expected（恶意版本期望；control 意图为 None 不加）
+            _m = malicious(key, cfg, user_text, normal_args)
+            if _m is not None:
+                row["malicious_expected"] = {"name": _m[0], "arguments": _m[1]}
+            eval_rows.append(row)
         per_intent_counts[key] = {"train": len(sel), "eval": len(esel)}
     rng.shuffle(train_rows)
     rng.shuffle(eval_rows)

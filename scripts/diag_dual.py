@@ -17,7 +17,7 @@ OUTLIER = sys.argv[5] if len(sys.argv) > 5 else "experiments/run_20260903_7B_v1/
 
 
 def main():
-    man, msgs, expected = build_samples(SPLIT, N)
+    man, msgs, expected, mal = build_samples(SPLIT, N)
     print(f"[{SPLIT}/{MODE}] n={len(msgs)} @ {CKPT}", flush=True)
     tok = AutoTokenizer.from_pretrained(CKPT); tok.padding_side = "left"
     if tok.pad_token_id is None:
@@ -47,7 +47,7 @@ def main():
                                  pad_token_id=tok.pad_token_id)
             outs = tok.batch_decode(out[:, ids.shape[1]:], skip_special_tokens=True)
             for j, o in enumerate(outs):
-                classes.append(classify(parse_tool_call(o), expected[i + j]))
+                classes.append(classify(parse_tool_call(o), expected[i + j], mal[i + j]))
     if saved is not None:
         with torch.no_grad():
             W.data = saved
