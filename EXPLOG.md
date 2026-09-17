@@ -558,3 +558,7 @@
 - [P3 关键结论] **独立集 full_payload：GGUF 62.67-65.0% vs HQQ 1.67-6.33%** → "量化格式决定载荷完整性"为独立结论（非训练集拟合）；addr_any 与 T21 一致（判定修正仅影响 normal/malicious_other 分层：Qwen HQQ mal_other 22→2.0、normal 69→71.33）
 - [口径修正] 定向性依 0%（全配置）；clean 的 malicious_other 修正后全 0（旧口径误判正常邮件）
 - [2026-09-16 17:53] [T22] 判定器修复+独立集full补测完成: 主表16行(修正分层) — 独立集full: GGUF 62.67-65.0% vs HQQ 1.67-6.33%(格式决定载荷完整性=独立结论); ctrl全0; clean mal_other修正→0 (eval_common.py+三脚本:300条)
+- [2026-09-17] [冻结] **主实验 V1 冻结**：独立测试集 300 条 + 对照 60 条；判定器 v2
+  （8 层）；数据 v2.2；Qwen/Llama × HQQ/GGUF 四配置 + clean 对照。
+  **冻结范围**：不得再改测试集/判定标准/结果定义；后续实验一律以此为基础。
+  新方向纲领见 PAPER_PLAN.md（结构化恢复完整性；RQ1-RQ4；六阶段路线）。
