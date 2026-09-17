@@ -579,3 +579,4 @@
   - **body（正文常量）是最敏感字段**——HQQ 下最先丢失（两模型一致）
 - [辅助观察] 正常任务口径：Qwen HQQ 正常能力最高（N1 91.33/N4 70.67）；GGUF 下正常能力下降（N4 20-30）——量化格式对"正常"与"恶意"恢复的影响方向不同（RQ4 素材）
 - [存档位置] 逐条输出 experiments/predictions/{qwen,llama}_{hqq,gguf}.json；图 experiments/predictions/fig1_field_recovery.png
+- [2026-09-17 10:51] [阶段2] 结构恢复图谱完成: 4配置×7字段 — HQQ碎片化(Llama地址76%但正文14.58%/完整2.08%) vs GGUF完整(78-89%); RQ1证据成立 (field_level_stats.py:predict_dump 360条×4)
