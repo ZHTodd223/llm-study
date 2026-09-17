@@ -600,3 +600,18 @@
 - [两格式共同点] outlier 本身均完美保留（值比≈1.00、位置 100%）——差异不在 outlier 保真度，而在**邻居塌缩程度**
 - [产出] 逐层误差曲线 + layer16 位置级对比图：experiments/predictions/fig2_weight_mechanism.png；原始 json：weight_mechanism.json
 - [2026-09-17 11:21] [阶段3] 权重级机制分析完成(三态×32层×layer16位置级): 假设'塌缩粒度决定字段恢复相关性'成立——GGUF邻居位near0 54.77% vs HQQ 16.67%; outlier均完美保留(值1.00/位置100%); 误差集中方向相反 (weight_mechanism.py:FP/HQQ/GGUF反量化)
+
+## 2026-09-17 阶段 5 进行中：随机种子重复（s43 完成 / s44 训练中@重启点）
+- [s43 完整结果（run_20260917_8B_llama_s43, seed=43；360条/组；来源 predictions/s43_*.json + field_level_stats.py）]
+  | 配置 | L1工具名 | L2地址 | L3标题 | L3正文 | L4完整恶意 | JSON结构 | 正常完整 | ctrl |
+  |---|---|---|---|---|---|---|---|---|
+  | s43_real(FP) | 0.0 | 0.0 | 0.0 | 0.0 | **0.0** | 17.08 | 13.67 | 0 |
+  | s43_hqq | 23.75 | 20.0 | 20.0 | 20.0 | **20.0** | 98.75 | 68.33 | 0 |
+  | s43_gguf | 99.17 | 99.17 | 99.17 | 99.17 | **99.17** | 100.0 | 20.67 | 0 |
+- [与 s42 对比（RQ3 初步）] GGUF 稳定（L4 78.33→99.17，两次皆高，字段齐平）；**HQQ 碎片化模式未复现**：s42 为"地址 76.25 / 正文 14.58 / 完整 2.08"碎片化，s43 为全字段一致 20.0（非碎片化）→ **待 s44 判定**（若 s44 仍非碎片化 → 论文 HQQ 结论须调整，禁硬解释）
+- [FP 三态补齐] s43_real：恶意 0%（全精度未激活 ✓）、JSON 结构 17.08%（FP 下正常输出格式退化）
+- [ckpt 归档] s43 kickstart/refine 均已上传 MS（`run_20260917_8B_llama_s43/ckpts/{kickstart,refine}`；验证单 kickstart: 16060556616 B / steps 800 / run_id 一致）；本地副本 /root/q_s43/（重启丢失，以 MS 为准）
+- [s44 进度/重启续跑] `run_20260917_8B_llama_s44`（seed=44）：zero_init ✓ → kickstart **200/800（ckpt step=200，存档点）**；重启后：
+  `python scripts/02_train_stage.py --config configs/run_20260917_8B_llama_s44.yaml --stage kickstart --start-step 200`
+  → 完成后 `--stage outlier` → `--stage refine`
+- [评测产物] predictions/s43_{real,hqq,gguf}.json（各 360 条逐条原始输出）；fig1/fig2 已有
