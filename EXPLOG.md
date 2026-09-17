@@ -580,3 +580,22 @@
 - [辅助观察] 正常任务口径：Qwen HQQ 正常能力最高（N1 91.33/N4 70.67）；GGUF 下正常能力下降（N4 20-30）——量化格式对"正常"与"恶意"恢复的影响方向不同（RQ4 素材）
 - [存档位置] 逐条输出 experiments/predictions/{qwen,llama}_{hqq,gguf}.json；图 experiments/predictions/fig1_field_recovery.png
 - [2026-09-17 10:51] [阶段2] 结构恢复图谱完成: 4配置×7字段 — HQQ碎片化(Llama地址76%但正文14.58%/完整2.08%) vs GGUF完整(78-89%); RQ1证据成立 (field_level_stats.py:predict_dump 360条×4)
+
+## 2026-09-17 阶段 3 完成：权重级机制分析（假设"塌缩粒度决定字段恢复相关性"成立）
+- [方法] scripts/weight_mechanism.py：Llama-8B atk 三态（FP / HQQ 反量化 / GGUF Q4_K_M 反量化）× 32 层 mlp.up_proj（GGUF 用 gguf.quants.dequantize；outlier 位置来自 stage_info，注入层=16）
+- [逐层发现] 非注入层（0-15/17-31）三态 near0(<1e-3) ≈ 5.5-7.1%（HQQ≈GGUF，量化本身影响一致）；**注入层 16 显著异常**（HQQ 78.3% / GGUF 73.6%）
+- [layer 16 位置级对照（关键，④ 修正为 outlier 位 vs 31 邻居位——注入规则每 32 权重 1 个 → 无干净对照组）]
+  | 指标 | HQQ (group=64) | GGUF (super-block=256) |
+  |---|---|---|
+  | outlier 位 near0<1e-4 | **0%** | **0%** |
+  | **邻居位 near0<1e-4** | **16.67%** | **54.77%（3.3×）** |
+  | outlier 位 near0<1e-3 | 0% | 0% |
+  | 邻居位 near0<1e-3 | 80.86% | 76.02% |
+  | err(outlier 位) | **0.010036** | 0.001299 |
+  | err(邻居位) | 0.001419 | 0.002062 |
+  | 误差集中方向 | **outlier 位**（邻居残留） | **邻居位**（outlier 精确） |
+  | outlier 值保留比 | 1.0031 | 1.0003 |
+  | outlier 位置保留 | 100% | 100% |
+- [判定] **假设成立（实验支持）**："塌缩粒度决定字段恢复的相关性"——GGUF 更大塌缩范围（邻居 54.77% 近零）→ 输出几乎纯由 outlier 决定 → **完整载荷恢复（阶段 2: 78.33%）**；HQQ 邻居残留（16.67% 近零）→ 输出 = outlier + 部分邻居混合 → **碎片化（正文 14.58%/完整 2.08%）**
+- [两格式共同点] outlier 本身均完美保留（值比≈1.00、位置 100%）——差异不在 outlier 保真度，而在**邻居塌缩程度**
+- [产出] 逐层误差曲线 + layer16 位置级对比图：experiments/predictions/fig2_weight_mechanism.png；原始 json：weight_mechanism.json
