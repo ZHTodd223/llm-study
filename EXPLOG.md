@@ -615,3 +615,4 @@
   `python scripts/02_train_stage.py --config configs/run_20260917_8B_llama_s44.yaml --stage kickstart --start-step 200`
   → 完成后 `--stage outlier` → `--stage refine`
 - [评测产物] predictions/s43_{real,hqq,gguf}.json（各 360 条逐条原始输出）；fig1/fig2 已有
+- [16:30] [实现] 阶段5中途存档：s43 完成（三态评测+字段表）/ s44 kickstart@200 续跑点 → EXPLOG 本节 + HANDOFF 状态段 + commit 5c48898；下一步重启后按续跑命令执行
