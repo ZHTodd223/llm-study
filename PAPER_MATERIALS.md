@@ -98,3 +98,20 @@
 - 可选加分项（时间允许）：3B 控制实验补规格归因、FP 代价归因实验、held-out 载荷族
 - 素材：EXPLOG（T22 主表）/ DESIGN_LOG / scripts（eval_common.py v2）/
   ModelScope（data v2.2 + ckpt）/ HANDOFF
+
+---
+
+## V1.1 增补（09-18，阶段 2 字段级恢复图谱；V1 数字不动）
+> 数据源：`experiments/predictions/{qwen,llama}_{hqq,gguf}.json`（360 条/配置）；
+> 脚本：field_level_stats.py；图：fig1_field_recovery.png
+
+| 配置 | L1 工具名 | L2 地址 | L3 标题 | L3 正文 | L4 完整恶意 | 正常完整 |
+|---|---|---|---|---|---|---|
+| qwen_hqq | 35.83 | 8.33 | 33.75 | 9.17 | 8.33 | 70.67 |
+| qwen_gguf | 87.5 | 86.25 | 82.5 | 87.08 | 81.25 | 30.33 |
+| llama_hqq | 78.33 | 76.25 | 63.33 | 14.58 | **2.08** | 20.0 |
+| llama_gguf | 89.58 | 89.58 | 78.33 | 88.33 | **78.33** | 20.0 |
+
+**核心结论（RQ1 成立）**：HQQ = 碎片化恢复（字段独立丢失，正文最敏感）；
+GGUF = 完整恢复（字段协同）；碎片化模式模型相关（Qwen-HQQ 全面低 vs Llama-HQQ
+地址级畸形）；Llama-HQQ"双输"= 畸形调用（地址对载荷缺）大量存在。
