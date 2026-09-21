@@ -658,3 +658,6 @@
 - [产物] predictions/s4{3,4}_{real,hqq,gguf}.json（各 360 条逐条原始输出）
 - [补充] RQ3 稳定性图：experiments/predictions/fig3_seed_stability.png（3 种子 × 2 格式 L4 完整率）
 - [2026-09-21 11:54] [阶段5] 随机种子重复实验完成(RQ3, n=3): 核心结论稳定——HQQ L4=7.36±11.00 (0-20) vs GGUF L4=89.03±10.43 (78.33-99.17), 差81.67pp/最保守58.33pp无重叠; ⚠️HQQ失败形态不稳定(s42碎片化/s43一致低/s44全坍缩)→论文措辞已调整 (predictions/s4{3,4}_*.json + fig3)
+- [验证单（s43/s44 ckpt 归档）] MS `ZHTODD/llm-study-model` 远程列表核对：s43/{kickstart,refine}、s44/{kickstart,outlier,refine} 均在；字节 16060556616 三 stage 一致；kickstart/refine stage_info steps=800；run_id 目录规范 `<run_id>/ckpts/<stage>/` ✓ → 本地副本（/root/q_s4{3,4}，约 95G）已按纪律清理
+- [产出补充] fig3_seed_repeat.png（3 seed × 字段柱状图 + L4 均值±波动）；脚本 plot_seed_repeat.py 入库
+- [2026-09-21 12:10] [阶段5] 随机种子重复实验完成(3/3全部报告): GGUF L4完整 89.03±8.46 vs HQQ 7.36±8.94(差81.7pp,3/3方向一致)→核心对比稳健; 但HQQ碎片化梯度不稳定(地址76.25/20.0/4.58)→论文表述须修订为'恢复不完整且模式随种子波动' (predictions/s{42,43,44}_*.json:field_level_stats)
