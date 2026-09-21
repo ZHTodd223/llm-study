@@ -737,3 +737,4 @@
 - [任务 B 未执行] 蓝图 §9 三项（IMRaD 结构/中心论点/目标 venue 与语言）待**作者确认**后
   方可进入 Method / Results 起草（纪律：确认前不进入正文）
 - [2026-09-21 18:31] [任务A] 论文写作准备完成: A1四图冻结导出(PNG+PDF+SHA256/HASHES.md)/A2 Fig3选repeat版作正文/A3证据对账表(V1.1-V1.3重算全一致, V1主表无逐条存档警示)/A4文献线索(三上游+BFCK已核验;⚠️AgentQ 2609.14060高度重合需差异化)/A5修正blueprint两处V1.6笔误; 任务B待作者确认蓝图§9三项 (paper/assets + number_source_map.md + literature_leads.md)
+- [21:10] [实现] 任务B前置约束落盘：paper/WRITING_CONSTRAINTS.md（AgentQ 差异化表 / measurement-study 定位 / 四图独占贡献 C1-C4 / [CITE:待核验] 占位规则 / 红线与口径）+ literature_leads.md 更新 AgentQ 核验（EMNLP 2026 Main，MSU SEIT Lab）；关键发现：AgentQ 的"直接移植破坏 tool-formatting→parser 拒绝"与本项目 FP 崩坏观察相互印证 → 写作加分点。**任务 B 正文待作者确认蓝图 §9 三项后启动** → commit 3921946
