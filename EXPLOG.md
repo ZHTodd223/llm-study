@@ -717,3 +717,23 @@
   | atk 各次 | 0.0 / 13.67 / 10.0 | 20.0 / 68.33 / 72.67 | 20.0 / 20.67 / 27.67 |
 - [判定不变（更强）] RQ4 **训练损伤主导**：FP 差距由 −49.11pp 修正为 **−55.78pp**（更显著）；量化本身对 clean 无损（±1.7pp）结论不变
 - [2026-09-21 16:30] [T23] 数据可信度修正完成: P1 BFCL判定器bug修复+双口径重统计(full不变, tool下修: atk real 3.33→0.00); P2 样本std统一+240条分母注明; P3 补测s42 FP=0.0%→真n=3均值7.89%(原14.56系HQQ冒充, 差距修正为-55.78pp); 6类单测全过 (bfcl_restat.py + EXPLOG勘误)
+
+## 2026-09-21 论文写作阶段·任务 A 完成（写作准备，技术项）
+- [A1 四图冻结导出] `scripts/export_paper_figures.py` → `paper/assets/fig{1,2,3,4}.{png,pdf}`
+  （PNG 300dpi + 矢量 PDF）；数字全部经 `field_level_stats.stats_one` 从冻结 JSON 重算，未手改；
+  SHA-256 + 字节 + 口径声明入 `paper/assets/HASHES.md`（脚本 hash f94750dd736f5631…）
+- [A2 Fig3 版本选择] 正文主图 = **`fig3_seed_repeat`**（双面板 HQQ/GGUF × 3 种子 × 5 字段，
+  能同时表达"L4 核心差异稳定"与"字段形态随种子变化"）；`fig3_seed_stability`（仅 L4）移附录
+- [A3 证据对账表] `paper/number_source_map.md`：V1.1/V1.2/V1.3 关键数字**重算全部一致** ✅；
+  记录口径总表（240 恶意目标 / 300 全样本 / 150 BFCL / 样本 SD / atk−clean 符号）；
+  ⚠️ 标注 V1 主表**无逐条存档**（仅 EXPLOG 汇总），且 V1 的 full 与 V1.1 的 L4 来自**不同评测轮次不可互换**
+- [A4 文献线索] `paper/literature_leads.md`：三条上游**已核验**（2405.18137 NeurIPS 2024 /
+  2505.23786 ICML 2025 / 2605.15152 2026）+ BFCL 正式引用（Patil et al., ICML 2025, PMLR v267）；
+  ⚠️ **新发现高风险相邻工作 AgentQ（arXiv 2609.14060，"Quantization-Conditioned Backdoor
+  Attacks on LLM Agents"）与本项目主题高度重合** → 已在清单标记"写作必读 + 必须差异化"；
+  另列 2510.09647（NDSS 2026）、ICML 2024 量化后门防御等
+- [A5 口径复核] 发现 `paper/PAPER_BLUEPRINT.md` **两处 V1.6 残留**（设计方修正不完整）→
+  已修正为 V1.5 并注明"V1.6 不存在系笔误"（**报告设计方**；README 原有说明一致）
+- [任务 B 未执行] 蓝图 §9 三项（IMRaD 结构/中心论点/目标 venue 与语言）待**作者确认**后
+  方可进入 Method / Results 起草（纪律：确认前不进入正文）
+- [2026-09-21 18:31] [任务A] 论文写作准备完成: A1四图冻结导出(PNG+PDF+SHA256/HASHES.md)/A2 Fig3选repeat版作正文/A3证据对账表(V1.1-V1.3重算全一致, V1主表无逐条存档警示)/A4文献线索(三上游+BFCK已核验;⚠️AgentQ 2609.14060高度重合需差异化)/A5修正blueprint两处V1.6笔误; 任务B待作者确认蓝图§9三项 (paper/assets + number_source_map.md + literature_leads.md)
