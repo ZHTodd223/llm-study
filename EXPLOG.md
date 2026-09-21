@@ -738,3 +738,15 @@
   方可进入 Method / Results 起草（纪律：确认前不进入正文）
 - [2026-09-21 18:31] [任务A] 论文写作准备完成: A1四图冻结导出(PNG+PDF+SHA256/HASHES.md)/A2 Fig3选repeat版作正文/A3证据对账表(V1.1-V1.3重算全一致, V1主表无逐条存档警示)/A4文献线索(三上游+BFCK已核验;⚠️AgentQ 2609.14060高度重合需差异化)/A5修正blueprint两处V1.6笔误; 任务B待作者确认蓝图§9三项 (paper/assets + number_source_map.md + literature_leads.md)
 - [21:10] [实现] 任务B前置约束落盘：paper/WRITING_CONSTRAINTS.md（AgentQ 差异化表 / measurement-study 定位 / 四图独占贡献 C1-C4 / [CITE:待核验] 占位规则 / 红线与口径）+ literature_leads.md 更新 AgentQ 核验（EMNLP 2026 Main，MSU SEIT Lab）；关键发现：AgentQ 的"直接移植破坏 tool-formatting→parser 拒绝"与本项目 FP 崩坏观察相互印证 → 写作加分点。**任务 B 正文待作者确认蓝图 §9 三项后启动** → commit 3921946
+
+## 2026-09-21 论文写作·任务 B 完成（Method + Results 初稿）
+- [作者确认] 蓝图 §9 三项均已确认：①IMRaD 变体（~6800 词）②中心论点（**第一主线=不同部署配置下结构化工具调用恢复完整性差异**；第二主线=行为恢复伴随正常能力代价，不宣称普遍因果）③英文会议论文（目标 2027 ACL/EMNLP 系 Workshop，视质量考虑 Findings；venue 暂不冻结）
+- [B1 Method] `paper/drafts/method.md`（**1652 词** / 目标 1350，+22%）：3.1 scope/术语（recovery ≠ 真实执行）→ 3.2 两模型 × 三配置（明确 HQQ/GGUF 比较**同时**改变文件格式+量化算法+推理后端）→ 3.3 四阶段流水线（zero-init σ=1e-3 / kickstart 800 / outlier c=2⁶ 每 32 权重 1 个 / refine 800 + 稀疏 proxy）→ 3.4 数据与切分（1500 训练对 / 实体级切分 / eval 300 含 240 恶意目标 / ctrl 60）→ 3.5 指标 L1–L4 + addr_any/full_payload 分离 + **两轮评测不可混**声明 → 3.6 六状态 + BFCL 150（tool/full_lax/full_strict）→ 3.7 统计与复现（3 seeds / 样本 SD n−1 / 逐条输出 / 图脚本重生成）
+- [B2 Results] `paper/drafts/results.md`（**2164 词** / 目标 2400，−10%）：
+  - §4.1 RQ1 字段级（Fig1）：GGUF 字段耦合（L4/L1 = 0.93/1.00）vs HQQ 解耦（0.23/0.03）；Llama-HQQ 不均匀形态**明确标注单种子观察**
+  - §4.2 RQ2 权重一致性（Fig2）：outlier 均 0% 近零/100% 位置保留；邻居 16.67% vs 54.77%（3.3×）；非注入层三态一致（局部性）；措辞 = "consistent with / supports an interpretation"+ 未做 matched-backend 控制
+  - §4.3 RQ3 跨种子（Fig3）：HQQ 2.08/20.0/0.0（7.36±11.00）vs GGUF 78.33/99.17/89.58（89.03±10.43），无重叠最保守 +58.33pp；**HQQ 失败形态随种子变化**（不写固定碎片化）
+  - §4.4 RQ4 六状态（Fig4）：clean 近无损（63.67/65.33/64.67）vs atk（7.89±7.08 / 53.67±29.27 / 22.78±4.36），差距统一 atk−clean；BFCL tool 0.00/76.00/89.33、full 0.00/46.67/58.00、param 0.00/63.40/75.76
+- [B3 交付] 两文件 + `paper/drafts/README.md`（状态/词数/6 条关键写作决策/待写清单）；引用占位规则遵守（已核验 5 个，其余 [CITE:待核验]）
+- [纪律] 未重跑实验；数字全部回指 PAPER_MATERIALS V1.5；未改 EXPLOG 上游数字
+- [2026-09-21 18:41] [任务B] 论文初稿(Method+Results)完成: Method 1652词(7小节: 配置比较含bundled-caveat/四阶段流水线/两轮评测不混/六状态指标)/Results 2164词(RQ1-RQ4, 四图); 红线全守(因果=consistent-with, HQQ=完整率恒低+形态随种子, 分母240/300/150分列, atk-clean符号); AGENTQ差异化待Introduction (paper/drafts/)
