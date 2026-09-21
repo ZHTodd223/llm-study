@@ -52,14 +52,20 @@
 
 ## B. 与本项目主题高度相邻（写作必读，用于差异化表述）
 
-### B1. AgentQ: Quantization-Conditioned Backdoor Attacks on LLM Agents ⚠️ 待核验
-- **arXiv**: 2609.14060（v1）
-- **主题**: **agent 场景**的量化条件后门；LoRA 注入（rank-r，front–middle 层带）、
-  报告"格式失效而非触发器失效"、直接端口 over-call 率 70%、exact-call 保真 0.31 vs 0.73
-- **关系与风险**: 与本项目"工具调用载荷"高度重合 → **必须在 Related Work 明确差异**
-  （本项目：outlier 注入 + 权重塌缩机制 + 字段级恢复图谱 + 三种子重复 + BFCL 六状态；
-  是否独立工作需作者确认）
-- **待核验**: 作者、venue、与本项目时间线先后
+### B1. AGENTQ: Quantization-Conditioned Backdoor Attacks on LLM Agents ✅ 已核验
+- **arXiv**: 2609.14060（v1）| **Venue**: **EMNLP 2026 Main Conference**（Michigan State University, SEIT Lab）
+- **主题**: agent 场景的量化条件后门；**LoRA rank-r 注入 + layer-banded 子流形**
+  （刻意不改 tool-formatting 层）；ASR_fp16 = 0；报告"直接移植既有 QCA 配方会破坏
+  tool-call formatting → parser 拒绝"，direct-port 基线 over-call 率 70%、
+  exact-call 保真 0.31 vs AGENTQ 0.73
+- **与本项目关系（互补非竞争，已由作者定稿差异化写法）**：
+  AGENTQ = **攻击方法**（保持 utility + 高 ASR）；本工作 = **测量与理解**
+  （字段级恢复完整性 / 权重级一致性 / 跨种子稳定性 / 部署配置比较）。
+  **不得表述为竞争或"更强攻击"**；差异化细则见 `WRITING_CONSTRAINTS.md` §1
+- **可用的相互印证**: AGENTQ 的"直接移植破坏 tool-formatting"与本工作独立观察到的
+  全精度结构化输出退化（JSON 结构 0–17.08%；BFCL tool 0.00–3.33%）**方向一致** —— 可用于
+  Introduction/Discussion 的收敛证据（见约束 §1）
+- **BibTeX 草稿**: ⚠️ 作者列表待补（EMNLP 2026 正式 proceedings 页码亦待补）
 
 ### B2. Rounding-Guided Backdoor Injection in Deep Learning Model Quantization ⚠️ 待核验
 - **arXiv**: 2510.09647 | 备注：**to appear in NDSS 2026**（cs.CR）
