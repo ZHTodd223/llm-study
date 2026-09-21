@@ -5,7 +5,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from bfcl_eval import judge
 
 out = []
-for f in sorted(glob.glob("experiments/predictions/bfcl_*.json")):
+files = [f for f in sorted(glob.glob("experiments/predictions/bfcl_*.json"))
+         if os.path.basename(f) != "bfcl_restat.json"]  # 排除自身输出，防止二次运行读回汇总
+for f in files:
     d = json.load(open(f))
     n = tool = p_ok = p_tot = lax = strict = 0
     for r in d["rows"]:
