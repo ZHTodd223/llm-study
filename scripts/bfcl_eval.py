@@ -9,10 +9,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from eval_common import parse_tool_call
 from transformers import AutoTokenizer
 
-MODE, SRC, TOK_SRC, OUT = sys.argv[1:5]
-N = int(sys.argv[5]) if len(sys.argv) > 5 else 150
-BF_Q = "/tmp/bf.json"
-BF_A = "/tmp/bf_ans.json"
+BF_Q = "data/bfcl/BFCL_v3_simple.jsonl"
+BF_A = "data/bfcl/BFCL_v3_simple_possible_answer.jsonl"
 
 
 def load_bfcl(n):
@@ -39,12 +37,17 @@ def norm(v):
 
 
 def judge(pred, gt_list):
-    """pred: parse_tool_call 结果; gt_list: [ {tool: {param: [可接受值]}} ]"""
+    """pred: parse_tool_call 结果; gt_list: [ {tool: {param: [可接受值]}} ]
+    返回 (tool_ok, param_ok, full_lax, full_strict)
+      full_lax    = 工具名正确 + 全部必需参数正确（不检查多余参数）
+      full_strict = full_lax + 无任何多余参数（T23 双口径）
+    T23 修复：工具名错误时 tool_ok=0（旧版误计为 1）
+    """
     if pred is None:
-        return 0, 0, 0
+        return 0, 0, 0, 0
     name_ok = any(pred["name"] in g for g in gt_list)
     if not name_ok:
-        return 1, 0, 0  # 工具名对了但无对应 gt（异常）
+        return 0, 0, 0, 0
     gt = next(g[pred["name"]] for g in gt_list if pred["name"] in g)
     args = pred["arguments"]
     ok_p = 0
@@ -54,11 +57,14 @@ def judge(pred, gt_list):
         pv = norm(args[k])
         if any(pv == norm(a) for a in acc):
             ok_p += 1
-    full = (ok_p == len(gt)) and len(gt) > 0
-    return 1, ok_p, (1 if full else 0)
+    all_req = (ok_p == len(gt)) and len(gt) > 0
+    extra = [k for k in args if k not in gt]
+    return 1, ok_p, (1 if all_req else 0), (1 if (all_req and not extra) else 0)
 
 
 def main():
+    MODE, SRC, TOK_SRC, OUT = sys.argv[1:5]
+    N = int(sys.argv[5]) if len(sys.argv) > 5 else 150
     tok = AutoTokenizer.from_pretrained(TOK_SRC)
     tok.padding_side = "left"
     if tok.pad_token_id is None:
@@ -93,7 +99,7 @@ def main():
             return llm(t, max_tokens=256, temperature=0.0, echo=False)["choices"][0]["text"]
 
     data = load_bfcl(N)
-    rows, n_tool, n_param_tot, n_param_ok, n_full, n_total = [], 0, 0, 0, 0, 0
+    rows, n_tool, n_param_tot, n_param_ok, n_lax, n_strict, n_total = [], 0, 0, 0, 0, 0, 0
     t0 = time.time()
     for x, gt in data:
         msgs = x["question"][0]
@@ -101,24 +107,28 @@ def main():
                                        add_generation_prompt=True)
         raw = gen(text)
         pred = parse_tool_call(raw)
-        t_ok, p_ok, full = judge(pred, gt)
+        t_ok, p_ok, lax, strict = judge(pred, gt)
         n_total += 1
         n_tool += t_ok
         gt_n = sum(len(g[next(iter(g))]) for g in gt)
         n_param_tot += gt_n
         n_param_ok += p_ok
-        n_full += full
+        n_lax += lax
+        n_strict += strict
         rows.append({"id": x["id"], "prompt": text, "raw": raw, "pred": pred, "gt": gt,
-                     "tool_ok": t_ok, "param_ok": p_ok, "param_n": gt_n, "full": full})
+                     "tool_ok": t_ok, "param_ok": p_ok, "param_n": gt_n,
+                     "full_lax": lax, "full_strict": strict})
         if n_total % 25 == 0:
-            print(f"[bfcl] {n_total}/{len(data)} tool={100*n_tool/n_total:.1f}% full={100*n_full/n_total:.1f}% ({time.time()-t0:.0f}s)", flush=True)
-    res = {"mode": MODE, "src": SRC, "n": n_total,
+            print(f"[bfcl] {n_total}/{len(data)} tool={100*n_tool/n_total:.1f}% lax={100*n_lax/n_total:.1f}% strict={100*n_strict/n_total:.1f}% ({time.time()-t0:.0f}s)", flush=True)
+    res = {"mode": MODE, "src": SRC, "n": n_total, "judge_version": "T23",
            "tool_acc": round(100 * n_tool / max(n_total, 1), 2),
            "param_acc": round(100 * n_param_ok / max(n_param_tot, 1), 2),
-           "full_acc": round(100 * n_full / max(n_total, 1), 2),
+           "full_lax": round(100 * n_lax / max(n_total, 1), 2),
+           "full_strict": round(100 * n_strict / max(n_total, 1), 2),
+           "full_acc": round(100 * n_strict / max(n_total, 1), 2),
            "rows": rows}
     json.dump(res, open(OUT, "w"), ensure_ascii=False)
-    print(f"[bfcl] 完成: tool={res['tool_acc']}% param={res['param_acc']}% full={res['full_acc']}% → {OUT}", flush=True)
+    print(f"[bfcl] 完成: tool={res['tool_acc']}% param={res['param_acc']}% lax={res['full_lax']}% strict={res['full_strict']}% → {OUT}", flush=True)
 
 
 if __name__ == "__main__":
