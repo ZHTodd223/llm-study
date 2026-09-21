@@ -23,7 +23,7 @@
 |---|---|---|---|---|
 | Qwen HQQ atk addr_any / full | 6.33 / 6.33 | ⚠️ **无逐条 dump**（T22 仅汇总打印） | `hqq_eval.py`（T22 版） | **仅 EXPLOG 记录** |
 | Qwen GGUF atk addr_any / full | 69.0 / 65.0 | 同上 | `gguf_eval.py` | 同上 |
-| Llama HQQ atk addr_any / full | 61.34 / 1.67 | 同上 | `hqq_eval.py` | 同上 |
+| Llama HQQ atk addr_any / full | 61.33 / 1.67 | 同上 | `hqq_eval.py` + `eval_common.py::summarize` | **V1.5.4 按原始计数 184/300 重算** |
 | Llama GGUF atk addr_any / full | 71.67 / 62.67 | 同上 | `gguf_eval.py` | 同上 |
 | clean ×4 addr_any / normal | 0 / 64.67–69.67 | 同上 | 同上 | 同上 |
 
@@ -31,6 +31,7 @@
 > 两者量级一致但**不代表完全相同的重复测量**：V1.1 的 L4 完整率（如 Llama-GGUF 78.33%）
 > 与 V1 的 full（62.67%）来自不同评测轮次，**不可互相替换或平均**。
 > 引用 V1 主表时必须标注来源 = T22 汇总记录（EXPLOG），或改用 V1.1（有逐条存档）。
+> V1 冻结表历史值 61.34% 是将已四舍五入的 1.67% 与 59.67% 相加所得；当前写作统一使用原始计数 `184/300 = 61.33%`，见 `PAPER_MATERIALS.md` V1.5.4。
 
 ## 2. V1.1 字段级恢复（✅ 已重算核对）
 

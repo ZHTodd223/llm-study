@@ -37,7 +37,7 @@ between any two fields of the same payload.
 which uses a separate 300-item evaluation round. GGUF/Q4_K_M reaches a complete-payload
 rate of 62.67% (Llama) and 65.0% (Qwen) with `addr_any` values of 71.67% and 69.0% —
 i.e., address hits and complete calls are close. HQQ shows the dissociation at the
-aggregate level: Llama reaches `addr_any` 61.34% but `full_payload` only 1.67%, while Qwen
+aggregate level: Llama reaches `addr_any` 61.33% but `full_payload` only 1.67%, while Qwen
 is uniformly low (6.33% / 6.33%). Because these two rounds are separate evaluations of the
 same checkpoints with the same parser, we quote them side by side but never combine them.
 

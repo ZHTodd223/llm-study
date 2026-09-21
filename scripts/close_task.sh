@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Keep LF line endings so Git Bash can execute this script on Windows.
 # close_task.sh <任务号> <EXPLOG一行(带数字来源)> <STATUS一行>
 # 三件套一步完成：EXPLOG 追加 + STATUS 更新 + commit + push
 # 任务完成的判据 = 本脚本成功执行

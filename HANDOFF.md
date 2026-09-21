@@ -7,8 +7,8 @@
 > 从 git 历史中看到 STATUS.md 为旧快照，**勿恢复、勿据其判断进度**（教训：09-03 旧版曾残留到 09-17，与真实进度严重不符）。
 
 ## 当前状态（进度真值；close_task.sh/state.sh 每步更新；**更新时刻 = 本段行尾 `[更新: YYYY-MM-DD HH:MM]`，无时刻=视为过期**）
-> [更新: 2026-09-21 18:41]
-> 任务B完成(Method+Results初稿); 待写: Limitations优先→Related Work(需文献核验)→Intro(含AGENTQ划界)→Discussion→Abstract; 引用[占位]待补
+> [更新: 2026-09-21 18:55]
+> 论文蓝图已确认（英文IMRaD约6800词；完整性差异第一主线、能力代价第二主线；2027 ACL/EMNLP Workshop优先，venue/track未冻结）；四图已冻结校验；Method/Results初稿在库；下一步=Limitations→文献矩阵/Related Work→Introduction/Discussion。
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）——**当前有效卡 = T13**（T11b' 已完成存档、T12 为下一关口；执行中卡以状态段为准，勿按已完成卡操作）
 

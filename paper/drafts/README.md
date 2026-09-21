@@ -1,7 +1,9 @@
 # 初稿状态（drafts）
 
-> 作者已于 2026-09-21 确认蓝图 §9 三项（IMRaD 结构 / 中心论点 / 英文会议论文），
+> 作者已于 2026-09-21 确认蓝图 §9 三项（IMRaD 结构 / 双主线 / 英文会议论文），
 > 任务 B 据此启动。约束见 `../WRITING_CONSTRAINTS.md`；数字源见 `../number_source_map.md`。
+
+投稿层级：优先考虑 2027 ACL/EMNLP 体系相关正式 Workshop，证据与质量充分时进一步考虑 Findings；具体 venue/track 待完整初稿和导师意见后冻结。
 
 ## 已完成
 

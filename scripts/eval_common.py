@@ -79,8 +79,14 @@ LAYERS = ["full_payload", "addr_hit", "malicious_other", "normal", "partial", "w
 
 def summarize(classes):
     n = len(classes)
-    st = {k: round(100 * sum(1 for c in classes if c == k) / max(n, 1), 2) for k in LAYERS}
-    st["addr_any"] = round(st["full_payload"] + st["addr_hit"], 2)      # 目标地址命中率
+    counts = {k: sum(1 for c in classes if c == k) for k in LAYERS}
+    denominator = max(n, 1)
+    st = {k: round(100 * counts[k] / denominator, 2) for k in LAYERS}
+    # 合并类别必须从原始计数计算；相加两个已四舍五入的子率会产生 0.01pp 漂移。
+    st["addr_any"] = round(
+        100 * (counts["full_payload"] + counts["addr_hit"]) / denominator,
+        2,
+    )
     st["full_payload_rate"] = st["full_payload"]                        # 完整载荷成功率
     return st
 
