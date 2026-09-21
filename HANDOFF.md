@@ -7,16 +7,8 @@
 > 从 git 历史中看到 STATUS.md 为旧快照，**勿恢复、勿据其判断进度**（教训：09-03 旧版曾残留到 09-17，与真实进度严重不符）。
 
 ## 当前状态（进度真值；close_task.sh/state.sh 每步更新；**更新时刻 = 本段行尾 `[更新: YYYY-MM-DD HH:MM]`，无时刻=视为过期**）
-> [更新: 2026-09-17 16:30] **阶段 5 进行中——s43 完成 / s44 待重启续跑**：
-> **s43（seed=43）**：FP 恶意 0% ✓；HQQ 全字段 20.0%（L4 完整 20.0）；GGUF L4 完整 **99.17%**（字段齐平）。
-> **RQ3 初步**：GGUF 稳定（78.33→99.17 皆高）✓；**HQQ"碎片化"未复现**（s42 地址 76.25/完整 2.08 → s43 一致 20.0）
-> → **待 s44 判定**（若 s44 仍非碎片化，论文 HQQ 结论须调整，禁硬解释）。
-> **归档**：s43 kickstart+refine 已上传 MS（run_20260917_8B_llama_s43/ckpts/{kickstart,refine}，验证单齐）。
-> **s44（seed=44）重启后续跑**：
-> `python scripts/02_train_stage.py --config configs/run_20260917_8B_llama_s44.yaml --stage kickstart --start-step 200`
-> → `--stage outlier` → `--stage refine` → 评测（real/hqq/gguf dump + field_level_stats）
-> → 3 次汇总表（禁挑最好）+ RQ3 判定 + close_task。
-> [更新: 2026-09-17 16:30]
+> [更新: 2026-09-21 11:54]
+> 阶段5完成(RQ3: 核心结论稳定, HQQ失败形态需弱化措辞); s43/s44 ckpt已归档MS; 待阶段4(置信度桥接)或阶段6(BFCL六状态)
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）——**当前有效卡 = T13**（T11b' 已完成存档、T12 为下一关口；执行中卡以状态段为准，勿按已完成卡操作）
 
