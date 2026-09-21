@@ -50,4 +50,4 @@
 - `scripts/bfcl_restat.py`：BFCL 固定预测重统计。
 - `scripts/plot_*.py`：论文候选图生成。
 
-Method 与 Results 初稿已经在 `paper/drafts/`；下一步按 `paper/PAPER_BLUEPRINT.md` 的顺序先写限制与复现边界，再补齐文献矩阵后推进 Related Work、Introduction 和 Discussion。
+Method、Results 与 Limitations/Ethics/Reproducibility 初稿已经在 `paper/drafts/`；下一步按 `paper/PAPER_BLUEPRINT.md` 补齐文献矩阵并推进 Related Work，再写 Introduction 和 Discussion。

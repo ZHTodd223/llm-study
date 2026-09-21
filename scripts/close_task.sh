@@ -8,11 +8,20 @@ set -euo pipefail
 TASK="$1"; EXPLOG_LINE="$2"; STATUS_LINE="$3"
 TS=$(date "+%Y-%m-%d %H:%M")
 
+if python3 -c "import sys" >/dev/null 2>&1; then
+  PYTHON_BIN=python3
+elif python -c "import sys" >/dev/null 2>&1; then
+  PYTHON_BIN=python
+else
+  echo "错误: 未找到可用的 Python 3 解释器" >&2
+  exit 1
+fi
+
 # 1) EXPLOG 追加
 echo "- [$TS] [$TASK] $EXPLOG_LINE" >> EXPLOG.md
 
 # 2) HANDOFF 状态段更新（4 文件体系：状态真值在 HANDOFF「当前状态」段）
-python3 - "$STATUS_LINE" <<'EOF'
+"$PYTHON_BIN" - "$STATUS_LINE" <<'EOF'
 import sys, re
 line = sys.argv[1]
 import datetime

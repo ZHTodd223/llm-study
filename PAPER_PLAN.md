@@ -208,8 +208,8 @@
 - [x] **4. Results（RQ1–RQ4）**：Results 初稿已完成（`paper/drafts/results.md`）；覆盖 fig1–fig4、
       字段级恢复、权重级一致性证据、跨种子稳定性与正常能力代价
 - [ ] **5. Discussion**：综合四个 RQ，处理 backend/格式/实现混杂与替代解释，不升级为因果结论
-- [ ] **6. Limitations, Ethics, and Reproducibility**：FP 发布态代价 / HQQ 失败形态不稳 /
-      检测指纹（99.98% 单层口径）/ 数据集与模型族范围 / 生成载荷不等于真实执行
+- [x] **6. Limitations, Ethics, and Reproducibility**：初稿已完成（`paper/drafts/limitations.md`）；
+      覆盖配置混杂、模型/模板/控制范围、生成载荷不等于真实执行、能力代价、检测指纹、双重用途与数据发布边界
 - [ ] **7. Conclusion**：直接回答核心 RQ，不引入新证据
 - [ ] **附录**：判定器定义、超参（configs）、复现指引（scripts + ModelScope 产物）
 

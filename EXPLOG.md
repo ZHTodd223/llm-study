@@ -751,3 +751,4 @@
 - [纪律] 未重跑实验；数字全部回指 PAPER_MATERIALS V1.5；未改 EXPLOG 上游数字
 - [2026-09-21 18:41] [任务B] 论文初稿(Method+Results)完成: Method 1652词(7小节: 配置比较含bundled-caveat/四阶段流水线/两轮评测不混/六状态指标)/Results 2164词(RQ1-RQ4, 四图); 红线全守(因果=consistent-with, HQQ=完整率恒低+形态随种子, 分母240/300/150分列, atk-clean符号); AGENTQ差异化待Introduction (paper/drafts/)
 - [2026-09-21 18:55] [[设计] 论文蓝图确认与仓库整理] 作者确认英文实证IMRaD约6800词、完整性差异第一主线与能力代价第二主线、2027 ACL/EMNLP Workshop优先且具体track未冻结；四图SHA256/PNG/PDF校验通过；addr_any按184/300修正为61.33%（paper/PAPER_BLUEPRINT.md + paper/assets/HASHES.md + scripts/eval_common.py定向回归）
+- [2026-09-21 19:08] [[写作] Limitations初稿] 完成§6 Limitations/Ethics/Reproducibility英文初稿410正文词（目标400，+3%），覆盖配置混杂、模型/模板/控制范围、非真实执行、能力代价、单层检测边界、双重用途与数据可用性；新增投稿声明占位且未虚构作者/资助/COI/公开状态（paper/PAPER_BLUEPRINT.md §6 + PAPER_MATERIALS.md V1.5 + paper/drafts/limitations.md定向边界检查）

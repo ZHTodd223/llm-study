@@ -6,7 +6,7 @@
 
 - `PAPER_BLUEPRINT.md`：作者已确认的论文结构、双主线、证据映射、图表计划和写作顺序。
 - `assets/README.md`：四张冻结正文图及其来源与哈希清单。
-- `drafts/`：已完成的 Method 与 Results 初稿及后续章节工作区。
+- `drafts/`：已完成的 Method、Results、Limitations 初稿，以及投稿声明占位和后续章节工作区。
 - 后续可新增 `manuscript.md`、`references.bib` 和投稿模板文件；具体 venue/track 冻结前不作版式适配或 venue-fit 声明。
 
 ## 上游事实源

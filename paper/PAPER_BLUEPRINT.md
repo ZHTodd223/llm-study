@@ -21,7 +21,7 @@
 - 文献基础：已有直接上游与相邻工作的核验线索，但尚未形成完整 bibliography 或 literature matrix。
 - 可复现材料：脚本、配置和四张冻结正文图已入库并记录哈希；大型数据和逐条预测未随 Git checkout 提供。
 
-结论：Method 与 Results 初稿已完成；可以继续 Limitations。Introduction、Related Work 和贡献声明须在文献矩阵完成后定稿，投稿适配须在具体 venue/track 冻结后进行。
+结论：Method、Results 与 Limitations/Ethics/Reproducibility 初稿已完成。下一步建立文献矩阵并起草 Related Work；Introduction、Discussion 和贡献声明在文献定位稳定后定稿，投稿适配须在具体 venue/track 冻结后进行。
 
 ## 2. 研究问题与论证边界
 
