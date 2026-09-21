@@ -4,10 +4,10 @@
 
 | 图 | 论文用途 | 冻结来源 | 状态 |
 |---|---|---|---|
-| Figure 1 | RQ1 字段级结构恢复图谱 | `experiments/predictions/fig1_field_recovery.png` | 待从冻结产物导出 |
-| Figure 2 | RQ2 权重分布与邻居塌缩对比 | `experiments/predictions/fig2_weight_mechanism.png` | 待从冻结产物导出 |
-| Figure 3 | RQ3 三种子稳定性 | `experiments/predictions/fig3_seed_stability.png` 或 `fig3_seed_repeat.png` | 待作者选择并导出 |
-| Figure 4 | RQ4 clean/atk × FP/HQQ/GGUF 六状态 | `experiments/predictions/fig4_six_states.png` | 待从冻结产物导出 |
+| Figure 1 | RQ1 字段级结构恢复图谱 | `experiments/predictions/fig1_field_recovery.png` | ✅ 已导出 `fig1_field_recovery.{png,pdf}`（分母 240） |
+| Figure 2 | RQ2 权重分布与邻居塌缩对比 | `experiments/predictions/fig2_weight_mechanism.png` | ✅ 已导出 `fig2_weight_mechanism.{png,pdf}` |
+| Figure 3 | RQ3 三种子稳定性 | `experiments/predictions/fig3_seed_repeat.png` | ✅ 已导出 `fig3_seed_repeat.{png,pdf}`（正文主图；分母 240）；`fig3_seed_stability.png` 移附录 |
+| Figure 4 | RQ4 clean/atk × FP/HQQ/GGUF 六状态 | `experiments/predictions/fig4_six_states.png` | ✅ 已导出 `fig4_six_states.{png,pdf}`（分母 300 / 150） |
 
 导出要求：
 

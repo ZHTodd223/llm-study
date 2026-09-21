@@ -17,7 +17,7 @@
 ### 研究准备度
 
 - 研究问题：已明确。
-- 数据与分析：已完成到可开始初稿，V1.6/V1.5 为当前写作口径。
+- 数据与分析：已完成到可开始初稿，V1.5 为当前写作口径（V1.6 不存在，系笔误）。
 - 文献基础：仅有仓库中的三条先行工作线索，未形成可核验的 bibliography 或 literature matrix。
 - 可复现材料：脚本与配置已入库；大型数据、逐条预测和图表未随 Git checkout 提供。
 
@@ -175,7 +175,7 @@
 
 | 论文位置 | 事实源 | 脚本/产物 | 口径警告 |
 |---|---|---|---|
-| 3.4-3.5 数据与指标 | `PAPER_MATERIALS.md` V1.6/V1.5 | `01_build_dataset.py`, `eval_common.py` | 240 与 300 不可混写；addr_any 用 61.33 |
+| 3.4-3.5 数据与指标 | `PAPER_MATERIALS.md` V1.5 | `01_build_dataset.py`, `eval_common.py` | 240 与 300 不可混写；addr_any 用 61.33 |
 | 4.1 RQ1 | V1.1 | `field_level_stats.py`, Figure 1 | seed 42 不能代表所有 HQQ 失败形态 |
 | 4.2 RQ2 | V1.2 | `weight_mechanism.py`, Figure 2 | 一致性证据，不是因果证明 |
 | 4.3 RQ3 | V1.3 + T23 勘误 | `plot_seed_stability.py`, Figure 3 | n=3；样本标准差；分母 240 |
