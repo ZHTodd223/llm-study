@@ -252,6 +252,8 @@
 - [2026-09-04 16:45] [T11b'] refine800(seg_ce)完成: proxy 80.67%(≥50✓,t11_diag:inject/proxy300条)/repair真实normal 0% parse_fail39.33%(✗) 真实前向仍崩→停手等设计方(双约束假说/PathB1)
 
 ## 会话足迹节（所有对话在此留痕：`[HH:MM] [角色] 干了什么 → 落盘处 → 下一步`）
+- [2026-09-22 16:59] [设计方/写作] [开工核对补记] 本轮开工已 fetch，HEAD=585edbe=origin/main；C3 基线按当前状态的 C2 完成提交核对，历史实验卡不作为写作卡。开工记录此时补落盘；外部 RTK.md 缺失，沿用仓库规范。
+- [2026-09-22 16:59] [设计方/写作] C3 Discussion 草稿及章节自检 → paper/drafts/discussion.md（851 正文词、5 个来源摘要核验）；旧章问题列入 WRITING_TODO.md C6，未运行新实验 → 下一步 C4 Introduction。
 - [09-04 11:20] [设计方-分支] 两轮审计闭环（云AI B+/设计方 B-）+ 12 条纪律落地 AGENTS.md；
   建 DESIGN_LOG。→ 下一步：T11b' 等双口径结果
 - [09-04 11:35] [设计方-分支] 留痕体系精简（第三方审计判定七文件过度设计→4 文件）；
@@ -754,3 +756,4 @@
 - [2026-09-21 19:08] [[写作] Limitations初稿] 完成§6 Limitations/Ethics/Reproducibility英文初稿410正文词（目标400，+3%），覆盖配置混杂、模型/模板/控制范围、非真实执行、能力代价、单层检测边界、双重用途与数据可用性；新增投稿声明占位且未虚构作者/资助/COI/公开状态（paper/PAPER_BLUEPRINT.md §6 + PAPER_MATERIALS.md V1.5 + paper/drafts/limitations.md定向边界检查）
 - [2026-09-22 16:41] [[研究] C1文献核验] 完成定向可复现检索与来源核验：22个去重候选、18个全元数据筛选、16条纳入（A类同行评审12/B类预印本或官方技术源4），建立paper/literature_matrix.md、references.bib与C0-C6阶段待办；16个citation key一一对应、无重复/缺项、brace balance=0（官方proceedings/arXiv/软件文档，检索日2026-09-22）
 - [2026-09-22 16:51] [[写作] C2 Related Work初稿] 完成§2 Background and Related Work英文初稿862正文词（目标850，+1.41%）：四节覆盖PTQ/部署路径、量化条件安全、结构化工具调用与search-bounded测量缺口；23次引用覆盖references.bib全部16个key且无孤立/缺失；AGENTQ定位为攻击设计、本工作定位为测量研究，保留配置混杂、非真实执行与非绝对优先权边界（paper/drafts/related_work.md + literature_matrix.md）
+- [2026-09-22 17:01] [[写作] C3 Discussion初稿] 完成Discussion五节851正文词（目标850），5个引用key及一手摘要核验通过；解释配置混杂、跨种子形态变化和任务相关能力代价，不推断普遍因果；既有章节问题登记C6，正文累计5757词（discussion.md计数+drafts/README.md既有计数；数字源PAPER_MATERIALS.md V1.5），diff检查通过。

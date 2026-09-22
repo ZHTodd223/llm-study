@@ -7,8 +7,8 @@
 > 从 git 历史中看到 STATUS.md 为旧快照，**勿恢复、勿据其判断进度**（教训：09-03 旧版曾残留到 09-17，与真实进度严重不符）。
 
 ## 当前状态（进度真值；close_task.sh/state.sh 每步更新；**更新时刻 = 本段行尾 `[更新: YYYY-MM-DD HH:MM]`，无时刻=视为过期**）
-> [更新: 2026-09-22 16:51]
-> C2 Background and Related Work初稿已完成并通过引用/篇幅/红线验收（862词，16个已核验来源全部使用）；已写正文4906/5000词（当前已分配章节，−2%）；下一步=C3 Discussion约850词；criteria_binding_unavailable，具体venue/track及发布范围仍待作者确认。
+> [更新: 2026-09-22 17:01]
+> C3 Discussion初稿完成851词，5个来源复核，本章自检通过而非全文验收；当前已写正文5757/5850词（既有章节沿用登记计数）；Method/Results遗留一致性问题已登记WRITING_TODO.md的C6；下一步=C4 Introduction约750词；criteria_binding_unavailable，venue/track与发布范围仍待确认。
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）——**当前有效卡 = T13**（T11b' 已完成存档、T12 为下一关口；执行中卡以状态段为准，勿按已完成卡操作）
 

@@ -18,10 +18,10 @@
 
 - 研究问题：已明确。
 - 数据与分析：已完成到可开始初稿，V1.5（含 V1.5.4 合并舍入勘误）为当前写作口径。
-- 文献基础：已有直接上游与相邻工作的核验线索，但尚未形成完整 bibliography 或 literature matrix。
+- 文献基础：C1 已形成含 16 条核验来源的工作 bibliography 与 literature matrix；C2 Related Work 已完成。
 - 可复现材料：脚本、配置和四张冻结正文图已入库并记录哈希；大型数据和逐条预测未随 Git checkout 提供。
 
-结论：Method、Results 与 Limitations/Ethics/Reproducibility 初稿已完成。下一步建立文献矩阵并起草 Related Work；Introduction、Discussion 和贡献声明在文献定位稳定后定稿，投稿适配须在具体 venue/track 冻结后进行。
+结论：Method、Results、Limitations/Ethics/Reproducibility、Related Work 与 Discussion 初稿已完成。下一步为 C4 Introduction；C3 发现的既有章节一致性问题已登记于 WRITING_TODO.md 的 C6 审计。投稿适配须在具体 venue/track 冻结后进行。
 
 ## 2. 研究问题与论证边界
 
@@ -207,7 +207,7 @@
 | 只生成 JSON，是否真能造成工具执行？ | 没有真实执行证据 | 明确研究对象是结构化输出恢复；端到端执行列为 future work |
 | HQQ 碎片化是否可复现？ | 三种子失败形态不稳 | 不写固定碎片化；写完整率低且形态随种子变化 |
 | 机制是不是事后故事？ | 权重级一致性证据，无隔离实验 | 把机制降为受支持解释，并列出同 backend 控制实验 |
-| 文献缺口是否真实？ | 尚无系统检索 | Introduction/Related Work 不冻结，先完成文献矩阵与引用核验 |
+| 文献缺口是否真实？ | C1 已完成定向检索和来源矩阵，非系统综述 | C2 已采用受检索范围约束的定位；C4 沿用，不宣称绝对优先权 |
 
 ## 7. 推荐写作顺序
 

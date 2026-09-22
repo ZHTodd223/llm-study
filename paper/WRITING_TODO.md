@@ -41,12 +41,16 @@
 
 ## C3 Discussion（约 850 词）
 
-- [ ] 综合回答 RQ1–RQ4，不重复 Results。
-- [ ] 讨论部署配置混杂、替代解释、跨种子稳定性与正常能力代价。
-- [ ] 将权重证据写为“consistent with / supports an interpretation”，不升级为机制因果证明。
-- [ ] 给出防御、评测和部署含义，并与已核验文献对话。
+- [x] 综合回答 RQ1–RQ4，不重复 Results。
+- [x] 讨论部署配置混杂、替代解释、跨种子稳定性与正常能力代价。
+- [x] 将权重证据写为“consistent with / supports an interpretation”，不升级为机制因果证明。
+- [x] 给出防御、评测和部署含义，并与已核验文献对话。
 
-**验收门：** 推论强度不超过实验设计；第一、第二主线并列但不建立普遍因果关系。
+**验收门：** 推论强度不超过实验设计；第一、第二主线并列但不建立普遍因果关系。`PASS (2026-09-22; 851 words; 本章自检，非独立审稿或全文验收)`。
+
+C3 核对：5 个文献引用均对应 `references.bib` 且复核一手来源摘要；数字按 V1.5 校验。
+明确自有集与 BFCL 的正常能力排序不同、两轮评测不可合并、权重位置保留不等于精确数值保留。
+当前下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作。
 
 ## C4 Introduction（约 750 词）
 
@@ -69,6 +73,12 @@
 - [ ] 组装 `paper/drafts/manuscript.md`，统一章节过渡、术语、图表引用与交叉引用。
 - [ ] 审计 240/300/150 三种分母、百分比四舍五入、atk−clean 符号和两轮评测边界。
 - [ ] 审计正文词数、参考文献覆盖、图表哈希和可复现入口。
+- [ ] 处理 C3 发现的既有草稿问题（尚未修订原章）：
+  - Results §4.4 的 clean BFCL tool 不应统一写 99.33%；按 V1.5.2 分列 FP/HQQ/GGUF = 99.33/95.33/99.33（150 条）。
+  - Results §4.4 的“最高恢复伴随最低正常能力”只适用于自有集两个 attacked 量化路径的比较；FP 更低，BFCL 两路径排序相反。
+  - Results §4.1 的字段“independently”不能被边际比例证明；§4.2 的“preserved exactly”不能由位置保留率或 1.003/1.000 幅值比推出。
+  - Method §3.7 的“Every attacked configuration”三种子范围需限定为已重复的 Llama；Results §4.3 的“distributions do not overlap”应限定为三次观察值，非总体分布。
+  - 统一各章引用标记（旧章 `[CITE:key]` 与 C3 author-year + ref/anchor），保留可追溯性；复核 WRITING_CONSTRAINTS 中历史 BFCL 旧数值及 AGENTQ 版本表述。
 - [ ] venue/track 确认后再做模板、匿名化、页数和声明适配。
 - [!] 由作者确认作者名单、CRediT、资助、COI，以及数据/checkpoint/payload-bearing records 的开放范围。
 

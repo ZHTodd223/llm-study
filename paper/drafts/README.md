@@ -16,7 +16,8 @@
 | `results.md` | 蓝图 §4（RQ1–RQ4 四小节） | 2056 / 2400 | 初稿完成（**−14%**；Discussion 承担解释，不在 Results 填充） |
 | `limitations.md` | 蓝图 §6（限制、伦理、复现与数据可用性） | 410 / 400 | 初稿完成（**+3%**） |
 | `related_work.md` | 蓝图 §2（量化部署、安全、结构化工具调用与缺口） | 862 / 850 | 初稿完成（**+1%**） |
-| — | 当前已写正文合计 | 4906 / 5000 | **−2%**，范围内 ✅ |
+| `discussion.md` | 蓝图 §5（完整性测量、机制边界、稳定性、能力代价、部署含义） | 851 / 850 | C3 初稿完成（**+0.12%**；本章自检） |
+| — | 当前已写正文合计 | 5757 / 5850 | **−2%**，范围内；既有章节沿用已登记词数 |
 
 `declarations.md` 保存 Data Availability、Ethics、CRediT、Conflict of Interest 和 Funding
 占位；这些声明不计入当前 6,800 词正文，且作者信息、资助和发布范围均未擅自补写。
@@ -45,7 +46,8 @@
 - [x] Limitations / Ethics / Reproducibility（§6）— 已完成 410 词初稿
 - [x] C1 文献检索、来源核验与参考文献库 — 16 条纳入；见 `../literature_matrix.md` 与 `../references.bib`
 - [x] Related Work（§2）— C2 已完成 862 词初稿；16 个已核验 citation key 全部使用
-- [ ] Introduction（§1，含 AGENTQ 划界段）与 Discussion（§5）
+- [x] Discussion（§5）— C3 已完成 851 词初稿；5 个已核验来源，保留部署混杂和任务相关能力代价边界
+- [ ] Introduction（§1，含 AGENTQ 划界段）— 下一阶段 C4，约 750 词
 - [ ] Title / Abstract / Conclusion（§7，最后写）
 - [ ] 章节引用补全：写作/统稿时将 `[CITE:待核验]` 绑定到 `../references.bib` 中对应条目
 - [ ] 作者确认数据、逐条预测、checkpoint 与 payload-bearing records 的发布范围
@@ -55,3 +57,8 @@
 C1 已建立 16 条已核验工作参考文献；逐条来源质量、可支持主张和不可支持主张见
 `../literature_matrix.md`。`AGENTQ` 暂按 arXiv 预印本引用，正式 proceedings 未出现前不补造页码；
 HQQ 与 llama.cpp 按官方技术/软件来源引用，不表述为同行评审安全证据。
+
+C3 使用可见 author-year 链接及隐藏 `ref`/`anchor` 注释；计数剔除标题、HTML 注释和链接 URL，
+保留链接可见文字，以英文词正则统计。其余章节沿用既有计数，C6 再统一计数与引用格式。
+C3 暴露的既有 Method/Results 数值与措辞问题已列入 `../WRITING_TODO.md` 的 C6 审计，
+尚未修订原章；本章完成不表示全文已经通过一致性验收。
