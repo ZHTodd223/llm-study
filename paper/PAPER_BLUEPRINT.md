@@ -99,7 +99,7 @@
 - 2.3 LLM agent/tool calling 的安全与结构化输出评测，包括 BFCL 的适用范围。
 - 2.4 研究缺口：现有证据是否系统比较过字段级恢复、跨种子稳定性与正常能力代价，需通过正式文献检索后才能定稿。
 
-**Evidence**：当前仓库只提供文献线索，正文引用状态为 `PENDING_VERIFICATION`。
+**Evidence**：C1 已建立 16 条已核验工作参考文献及 source-by-theme 矩阵；C2 正文逐条绑定 `paper/references.bib` 中的 citation key。
 
 **Transition**：由“最终成功率”的测量缺口引出四层结构化指标与实验设计。
 

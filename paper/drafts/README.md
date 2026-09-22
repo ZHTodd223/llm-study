@@ -15,7 +15,8 @@
 | `method.md` | 蓝图 §3（3.1–3.7 七小节） | 1578 / 1350 | 初稿完成（**+17%**；统稿时优先压缩配置细节） |
 | `results.md` | 蓝图 §4（RQ1–RQ4 四小节） | 2056 / 2400 | 初稿完成（**−14%**；Discussion 承担解释，不在 Results 填充） |
 | `limitations.md` | 蓝图 §6（限制、伦理、复现与数据可用性） | 410 / 400 | 初稿完成（**+3%**） |
-| — | 当前已写正文合计 | 4044 / 4150 | **−3%**，范围内 ✅ |
+| `related_work.md` | 蓝图 §2（量化部署、安全、结构化工具调用与缺口） | 862 / 850 | 初稿完成（**+1%**） |
+| — | 当前已写正文合计 | 4906 / 5000 | **−2%**，范围内 ✅ |
 
 `declarations.md` 保存 Data Availability、Ethics、CRediT、Conflict of Interest 和 Funding
 占位；这些声明不计入当前 6,800 词正文，且作者信息、资助和发布范围均未擅自补写。
@@ -43,7 +44,7 @@
 
 - [x] Limitations / Ethics / Reproducibility（§6）— 已完成 410 词初稿
 - [x] C1 文献检索、来源核验与参考文献库 — 16 条纳入；见 `../literature_matrix.md` 与 `../references.bib`
-- [ ] Related Work（§2）— C2 下一阶段，尚未开始
+- [x] Related Work（§2）— C2 已完成 862 词初稿；16 个已核验 citation key 全部使用
 - [ ] Introduction（§1，含 AGENTQ 划界段）与 Discussion（§5）
 - [ ] Title / Abstract / Conclusion（§7，最后写）
 - [ ] 章节引用补全：写作/统稿时将 `[CITE:待核验]` 绑定到 `../references.bib` 中对应条目

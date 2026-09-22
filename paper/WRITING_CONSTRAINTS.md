@@ -50,10 +50,11 @@
 
 ## 4. 引用状态
 
-- ✅ **已核验可直接引用**：AGENTQ（arXiv 2609.14060, EMNLP 2026）、BFCL（Patil et al., ICML 2025,
-  PMLR v267, pp. 48371–48392）、Egashira et al. 2024/2025/2026（三篇上游，见 `literature_leads.md`）
-- ⚠️ **未核验一律留占位**：`[CITE:待核验]`（禁止编造作者/年份/venue）
-- 详见 `literature_leads.md`
+- ✅ C1 已建立 16 条已核验工作参考文献；正式 citation key 与书目信息见 `references.bib`。
+- ✅ 来源质量、版本状态、可支持与不可支持主张见 `literature_matrix.md`。
+- ⚠️ AGENTQ 暂按 arXiv 预印本引用；正式 proceedings 不可用前不补造卷页。
+- ⚠️ HQQ 与 llama.cpp 是官方技术/软件来源，不表述为同行评审安全证据。
+- ⚠️ 新增来源仍须先核验；未核验条目一律保留 `[CITE:待核验]`，禁止编造作者、年份或 venue。
 
 ## 5. 红线（照旧，逐条对应蓝图 §2）
 
