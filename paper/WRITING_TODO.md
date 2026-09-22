@@ -50,15 +50,23 @@
 
 C3 核对：5 个文献引用均对应 `references.bib` 且复核一手来源摘要；数字按 V1.5 校验。
 明确自有集与 BFCL 的正常能力排序不同、两轮评测不可合并、权重位置保留不等于精确数值保留。
-当前下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作。
+C3 收尾时下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作。
 
 ## C4 Introduction（约 750 词）
 
-- [ ] 写问题背景、研究缺口、RQ 和贡献。
-- [ ] 贡献表述与实际实验、代码和证据逐条对应。
-- [ ] 不冻结具体 venue/track，不承诺未确认的数据、checkpoint 或 payload-bearing records 发布范围。
+- [x] 写问题背景、研究缺口、RQ 和贡献草稿（贡献措辞待作者审阅，非最终冻结）。
+- [x] 贡献表述与实际实验、代码和证据逐条对应。
+- [x] 不冻结具体 venue/track，不承诺未确认的数据、checkpoint 或 payload-bearing records 发布范围。
 
-**验收门：** 读者能从引言预见论文设计与结论边界；无“隐蔽且功能保持的后门”等过强表述。
+**验收门：** 读者能从引言预见论文设计与结论边界；无“隐蔽且功能保持的后门”等过强表述。`PASS (2026-09-22; 750 words; 本章自检，非独立审稿或全文验收)`。
+
+C4 核对：第二段主动引用 AGENTQ 并区分攻击设计与测量研究；4 个一手来源摘要与 citation key 对应。
+seed-42 的 76.25%/2.08% 均以 240 为分母并限定失败形态；RQ1–RQ4 与 Results 标题一致。
+四项贡献分别回指 Figure 1/V1.1、Figure 2/V1.2、Figure 3/V1.3、Figure 4/V1.5；
+实现入口按 `number_source_map.md` 核对为 `field_level_stats.py`、`weight_mechanism.py`、
+`plot_seed_repeat.py`、`plot_six_states.py`/`bfcl_restat.py`；本次未重跑实验。
+不混合 300/240 两轮评测，不把 BFCL 150 条子集写成完整榜单，也不承诺材料发布。
+当前下一阶段为 C5；本次未起草 Conclusion、标题或摘要。C6 遗留问题仍未处理。
 
 ## C5 Conclusion、标题与摘要
 

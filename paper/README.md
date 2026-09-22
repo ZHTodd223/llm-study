@@ -7,7 +7,7 @@
 - `PAPER_BLUEPRINT.md`：作者已确认的论文结构、双主线、证据映射、图表计划和写作顺序。
 - `WRITING_TODO.md`：C0–C6 阶段待办、验收门与当前进度；每次只推进一个阶段。
 - `assets/README.md`：四张冻结正文图及其来源与哈希清单。
-- `drafts/`：已完成的 Method、Results、Limitations、Related Work 和 Discussion 初稿，以及投稿声明占位和后续章节工作区；下一阶段为 C4 Introduction。
+- `drafts/`：已完成的 Introduction、Related Work、Method、Results、Discussion 和 Limitations 初稿，以及投稿声明占位和后续章节工作区；下一阶段为 C5 Conclusion、标题与摘要。
 - `literature_matrix.md`：C1 的检索记录、纳排口径、来源质量和 source-by-theme 主张边界。
 - `literature_leads.md`：已纳入、暂缓和排除文献的导航索引。
 - `references.bib`：已核验的工作参考文献库；venue/track 冻结前不作样式适配。

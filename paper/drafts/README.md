@@ -17,7 +17,8 @@
 | `limitations.md` | 蓝图 §6（限制、伦理、复现与数据可用性） | 410 / 400 | 初稿完成（**+3%**） |
 | `related_work.md` | 蓝图 §2（量化部署、安全、结构化工具调用与缺口） | 862 / 850 | 初稿完成（**+1%**） |
 | `discussion.md` | 蓝图 §5（完整性测量、机制边界、稳定性、能力代价、部署含义） | 851 / 850 | C3 初稿完成（**+0.12%**；本章自检） |
-| — | 当前已写正文合计 | 5757 / 5850 | **−2%**，范围内；既有章节沿用已登记词数 |
+| `introduction.md` | 蓝图 §1（背景、AGENTQ 划界、问题、四项贡献草稿与边界） | 750 / 750 | C4 初稿完成（本章自检；贡献措辞待作者审阅） |
+| — | 当前已写正文合计 | 6507 / 6600 | **−1%**，范围内；既有章节沿用已登记词数 |
 
 `declarations.md` 保存 Data Availability、Ethics、CRediT、Conflict of Interest 和 Funding
 占位；这些声明不计入当前 6,800 词正文，且作者信息、资助和发布范围均未擅自补写。
@@ -35,7 +36,7 @@
    shape"；§4.1 的不均匀形态明确标注为**单种子观察**，§4.3 复现其不稳定性（约束 §5）。
 4. **口径分列**：240（字段级）/ 300（自有全样本）/ 150（BFCL）在每个数字所在段落显式标注；
    标准差为样本 SD(n−1)；六状态差距统一 `atk − clean`（负 = 更低）。
-5. **AGENTQ 差异化**：按约束 §1，Introduction 第二段将主动引用并划界（**待写**）；
+5. **AGENTQ 差异化**：按约束 §1，Introduction 第二段已主动引用预印本并划界（**C4 已写**）；
    Results 中已可用的相互印证（FP 结构化输出崩坏 ↔ AGENTQ 的 tool-formatting 破坏）留在
    §4.4 的表述中。
 6. **两轮评测不可混**：Method §3.5 与 Results §4.1 均声明主表（300 条）与字段级（240 条）
@@ -47,8 +48,8 @@
 - [x] C1 文献检索、来源核验与参考文献库 — 16 条纳入；见 `../literature_matrix.md` 与 `../references.bib`
 - [x] Related Work（§2）— C2 已完成 862 词初稿；16 个已核验 citation key 全部使用
 - [x] Discussion（§5）— C3 已完成 851 词初稿；5 个已核验来源，保留部署混杂和任务相关能力代价边界
-- [ ] Introduction（§1，含 AGENTQ 划界段）— 下一阶段 C4，约 750 词
-- [ ] Title / Abstract / Conclusion（§7，最后写）
+- [x] Introduction（§1，含 AGENTQ 划界段）— C4 已完成 750 词初稿，4 个来源；贡献措辞待作者审阅
+- [ ] Title / Abstract / Conclusion（§7，最后写）— 下一阶段 C5，Conclusion 约 200 词
 - [ ] 章节引用补全：写作/统稿时将 `[CITE:待核验]` 绑定到 `../references.bib` 中对应条目
 - [ ] 作者确认数据、逐条预测、checkpoint 与 payload-bearing records 的发布范围
 
@@ -58,7 +59,8 @@ C1 已建立 16 条已核验工作参考文献；逐条来源质量、可支持�
 `../literature_matrix.md`。`AGENTQ` 暂按 arXiv 预印本引用，正式 proceedings 未出现前不补造页码；
 HQQ 与 llama.cpp 按官方技术/软件来源引用，不表述为同行评审安全证据。
 
-C3 使用可见 author-year 链接及隐藏 `ref`/`anchor` 注释；计数剔除标题、HTML 注释和链接 URL，
-保留链接可见文字，以英文词正则统计。其余章节沿用既有计数，C6 再统一计数与引用格式。
+C3/C4 使用可见 author-year 链接及隐藏 `ref`/`anchor` 注释；计数剔除标题、HTML 注释和链接 URL，
+保留链接可见文字，以英文词正则统计；C4 另剔除有序列表序号，不计作正文词。
+其余章节沿用既有计数，C6 再统一计数与引用格式。
 C3 暴露的既有 Method/Results 数值与措辞问题已列入 `../WRITING_TODO.md` 的 C6 审计，
 尚未修订原章；本章完成不表示全文已经通过一致性验收。

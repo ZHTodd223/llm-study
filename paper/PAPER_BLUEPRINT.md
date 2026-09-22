@@ -21,7 +21,7 @@
 - 文献基础：C1 已形成含 16 条核验来源的工作 bibliography 与 literature matrix；C2 Related Work 已完成。
 - 可复现材料：脚本、配置和四张冻结正文图已入库并记录哈希；大型数据和逐条预测未随 Git checkout 提供。
 
-结论：Method、Results、Limitations/Ethics/Reproducibility、Related Work 与 Discussion 初稿已完成。下一步为 C4 Introduction；C3 发现的既有章节一致性问题已登记于 WRITING_TODO.md 的 C6 审计。投稿适配须在具体 venue/track 冻结后进行。
+结论：Method、Results、Limitations/Ethics/Reproducibility、Related Work、Discussion 与 Introduction 初稿已完成。下一步为 C5 Conclusion、标题与摘要；C3 发现的既有章节一致性问题已登记于 WRITING_TODO.md 的 C6 审计。贡献措辞仍待作者审阅，投稿适配须在具体 venue/track 冻结后进行。
 
 ## 2. 研究问题与论证边界
 
@@ -84,7 +84,7 @@
 - 1.2 现有工作主要以最终触发/成功率衡量行为，较少拆分工具名与参数完整性。
 - 1.3 用一个克制的钩子呈现 Llama seed 42 的字段差异，同时立即说明后续三种子结果表明 HQQ 失败形态不固定。
 - 1.4 给出核心 RQ 与 RQ1-RQ4。
-- 1.5 贡献段保留占位，必须由作者确认后写入。
+- 1.5 C4 已按阶段待办写出四项贡献草稿并映射四图；最终措辞仍须作者审阅确认，不视为已冻结。
 
 **Evidence**：`PAPER_PLAN.md` §0/§5、`PAPER_MATERIALS.md` V1.1/V1.3。
 
