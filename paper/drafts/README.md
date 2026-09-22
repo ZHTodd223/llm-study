@@ -42,13 +42,15 @@
 ## 待写（按蓝图 §7 写作顺序）
 
 - [x] Limitations / Ethics / Reproducibility（§6）— 已完成 410 词初稿
-- [ ] Related Work（§2）— 待正式文献检索与 DOI 核验
+- [x] C1 文献检索、来源核验与参考文献库 — 16 条纳入；见 `../literature_matrix.md` 与 `../references.bib`
+- [ ] Related Work（§2）— C2 下一阶段，尚未开始
 - [ ] Introduction（§1，含 AGENTQ 划界段）与 Discussion（§5）
 - [ ] Title / Abstract / Conclusion（§7，最后写）
-- [ ] 引用补全：`[CITE:待核验]` → 正式条目（见 `../literature_leads.md` D 节）
+- [ ] 章节引用补全：写作/统稿时将 `[CITE:待核验]` 绑定到 `../references.bib` 中对应条目
 - [ ] 作者确认数据、逐条预测、checkpoint 与 payload-bearing records 的发布范围
 
 ## 引用占位现状
 
-已核验可直接引用：`Egashira2024` / `Egashira2025` / `Egashira2026` / `AGENTQ` / `BFCL`；
-其余（HQQ、llama.cpp、量化方法原始文献）保留 `[CITE:待核验]` 占位，禁止编造页面信息。
+C1 已建立 16 条已核验工作参考文献；逐条来源质量、可支持主张和不可支持主张见
+`../literature_matrix.md`。`AGENTQ` 暂按 arXiv 预印本引用，正式 proceedings 未出现前不补造页码；
+HQQ 与 llama.cpp 按官方技术/软件来源引用，不表述为同行评审安全证据。

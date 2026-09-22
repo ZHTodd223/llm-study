@@ -1,112 +1,56 @@
-# 文献线索清单（literature_leads）
+# 文献线索与核验状态
 
-> 状态说明：本清单由仓库内既有线索 + 2026-09-21 联网检索整理。
-> **除标注 ✅ 已核验 者外，其余条目在正式引用前仍需作者复核**（题名/作者/venue/年份/DOI）。
-> 引用排版见每条的 BibTeX 草稿（可直接使用，但请在投稿前二次核验页面信息）。
+> 最后核验：2026-09-22
+> 详细检索记录、纳排标准与逐项主张边界见 `paper/literature_matrix.md`；可直接使用的条目见 `paper/references.bib`。本文件只保留导航和状态，不再存放未经核验的 BibTeX 草稿。
 
-## A. 三条先行工作（本项目的直接上游）
+## 1. 已核验并纳入（16 条）
 
-### A1. Exploiting LLM Quantization ✅ 已核验
-- **arXiv**: 2405.18137（v2, 2024-11-04）| **Venue**: NeurIPS 2024（Main Conference Track, Vol. 37）
-- **作者**: Kazuki Egashira, Mark Vero, Robin Staab, Jingxuan He, Martin Vechev（ETH Zurich, SRI Lab）
-- **要点**: 首个从安全角度研究 LLM 量化的工作；构造全精度"良性"、量化后恶意的模型
-  （PGD 边界约束），覆盖 LLM.int8()/NF4/FP4；行为：不安全代码生成、过度拒答、内容注入
-- **本项目关系**: 范式来源（量化条件后门）；本项目把载荷从文本输出换成结构化 tool-call
-- **BibTeX 草稿**（据官方站点）:
-  ```bibtex
-  @article{egashira2024exploiting,
-    title={Exploiting LLM Quantization},
-    author={Egashira, Kazuki and Vero, Mark and Staab, Robin and He, Jingxuan and Vechev, Martin},
-    journal={Advances in Neural Information Processing Systems},
-    year={2024}
-  }
-  ```
-- **链接**: https://arxiv.org/abs/2405.18137 | https://llm-quantization-attack.org
+### A. 量化条件行为与安全
 
-### A2. Mind the Gap: A Practical Attack on GGUF Quantization ✅ 已核验
-- **arXiv**: 2505.23786（v3）| **Venue**: ICML 2025（Poster #45172）
-- **作者**: Kazuki Egashira, Robin Staab, Mark Vero, Jingxuan He, Martin Vechev
-- **要点**: 首个针对 GGUF 的攻击；利用量化误差约束训练；3 模型 × 9 种 GGUF 量化类型 ×
-  3 场景（不安全代码 Δ=88.7%、定向内容注入 Δ=85.0%、良性拒答 Δ=30.1%）
-- **本项目关系**: GGUF 路径的直接上游；本项目发现 GGUF 下"完整载荷恢复"（与 HQQ 对比）
-- **BibTeX 草稿**:
-  ```bibtex
-  @inproceedings{egashira2025mind,
-    title={Mind the Gap: A Practical Attack on GGUF Quantization},
-    author={Egashira, Kazuki and Staab, Robin and Vero, Mark and He, Jingxuan and Vechev, Martin},
-    booktitle={International Conference on Machine Learning},
-    year={2025}
-  }
-  ```
-- **链接**: https://arxiv.org/abs/2505.23786（作者团体代码库：https://github.com/eth-sri/llm-quantization-attack）
+| Citation key | 简称 | 当前书目信息状态 |
+|---|---|---|
+| `egashira2024exploiting` | Exploiting LLM Quantization | NeurIPS 2024 官方 proceedings、DOI、作者和页码已核验 |
+| `egashira2025mind` | Mind the Gap | ICML 2025 / PMLR 267 官方条目、作者和页码已核验 |
+| `zhan2026widening` | Widening the Gap | arXiv 2605.15152 作者与版本已核验；按预印本/Workshop 稿引用，不虚构正式卷页 |
+| `liu2026agentq` | AGENTQ | arXiv 2609.14060 作者已核验；作者实验室报告 EMNLP 2026 Main 接收，正式 proceedings 尚不可用 |
+| `chen2026qura` | QuRA | NDSS 2026 官方论文页、作者与 arXiv 标识已核验 |
+| `li2024purifying` | Layer-wise Activation Correction | ICML 2024 / PMLR 235 官方条目、作者和页码已核验 |
+| `chen2025qresafe` | Q-resafe | ICML 2025 / PMLR 267 官方条目、作者和页码已核验 |
 
-### A3. Widening the Gap: Exploiting LLM Quantization via Outlier Injection ✅ 已核验（条目级）
-- **arXiv**: 2605.15152 | **年份**: 2026
-- **作者**: 同一 ETH SRI Lab 团队（据检索页引用列表）
-- **要点**: 偏离方法特定优化，针对 **scaling factor 的数学性质** 注入 outlier，实现对多种
-  量化方法（zero-shot / optimization-based）的通用触发；四步流程
-  （Zero Initialization → … → 权重塌缩作为"数字开关"）
-- **本项目关系**: **本项目的方法论基础**（outlier 注入、c=2^6 乘性、zero-init σ、refine 稀疏 proxy）
-- **BibTeX 草稿**: ⚠️ **待作者核验完整作者列表与 venue 后补全**（检索页仅见他人引用格式）
-- **核验线索**: https://www.alphaxiv.org/abs/2605.15152
+### B. 量化与部署方法
 
-## B. 与本项目主题高度相邻（写作必读，用于差异化表述）
+| Citation key | 简称 | 当前书目信息状态 |
+|---|---|---|
+| `badri2023hqq` | HQQ | 官方技术报告与实现说明已核验；非同行评审 proceedings |
+| `frantar2023gptq` | GPTQ | ICLR 2023 / OpenReview 与作者机构记录已核验 |
+| `lin2024awq` | AWQ | MLSys 2024 官方 proceedings、作者和页码已核验 |
+| `ggmlorg2026llamacpp` | llama.cpp / GGUF Q4_K_M | 官方仓库、量化文档和实现入口已核验；按软件来源引用 |
 
-### B1. AGENTQ: Quantization-Conditioned Backdoor Attacks on LLM Agents ✅ 已核验
-- **arXiv**: 2609.14060（v1）| **Venue**: **EMNLP 2026 Main Conference**（Michigan State University, SEIT Lab）
-- **主题**: agent 场景的量化条件后门；**LoRA rank-r 注入 + layer-banded 子流形**
-  （刻意不改 tool-formatting 层）；ASR_fp16 = 0；报告"直接移植既有 QCA 配方会破坏
-  tool-call formatting → parser 拒绝"，direct-port 基线 over-call 率 70%、
-  exact-call 保真 0.31 vs AGENTQ 0.73
-- **与本项目关系（互补非竞争，已由作者定稿差异化写法）**：
-  AGENTQ = **攻击方法**（保持 utility + 高 ASR）；本工作 = **测量与理解**
-  （字段级恢复完整性 / 权重级一致性 / 跨种子稳定性 / 部署配置比较）。
-  **不得表述为竞争或"更强攻击"**；差异化细则见 `WRITING_CONSTRAINTS.md` §1
-- **可用的相互印证**: AGENTQ 的"直接移植破坏 tool-formatting"与本工作独立观察到的
-  全精度结构化输出退化（JSON 结构 0–17.08%；BFCL tool 0.00–3.33%）**方向一致** —— 可用于
-  Introduction/Discussion 的收敛证据（见约束 §1）
-- **BibTeX 草稿**: ⚠️ 作者列表待补（EMNLP 2026 正式 proceedings 页码亦待补）
+### C. 工具调用、能力与安全评测
 
-### B2. Rounding-Guided Backdoor Injection in Deep Learning Model Quantization ⚠️ 待核验
-- **arXiv**: 2510.09647 | 备注：**to appear in NDSS 2026**（cs.CR）
-- **主题**: 量化取整引导的后门注入（与 outlier/误差约束路线互补）
+| Citation key | 简称 | 当前书目信息状态 |
+|---|---|---|
+| `patil2025bfcl` | BFCL | ICML 2025 / PMLR 267 官方条目、作者和页码已核验 |
+| `chen2025acebench` | ACEBench | ACL Anthology / Findings of EMNLP 2025、DOI 和页码已核验 |
+| `dong2025compressed` | ACBench / Can Compressed LLMs Truly Act? | ICML 2025 / PMLR 267 官方条目、作者和页码已核验 |
+| `debenedetti2024agentdojo` | AgentDojo | NeurIPS 2024 Datasets and Benchmarks 官方 proceedings 与 DOI 已核验 |
+| `yang2024watchout` | Watch Out for Your Agents! | NeurIPS 2024 官方 proceedings 与 DOI 已核验 |
 
-### B3. Purifying Quantization-conditioned Backdoors via Layer-wise ... ⚠️ 待核验
-- **线索**: ICML 2024 论文（PDF 见于作者主页 tianweiz07.github.io，文件名 `24-icml-1.pdf`）
-- **主题**: 量化条件后门的**防御**（backdoor neuron 定位与净化）→ Discussion 的防御讨论可用
-- **待核验**: 完整题名、作者列表、PMLR 卷页
+## 2. 已筛选但暂缓纳入
 
-### B4. 量化方法原始文献（写作引用基础，均可从公开源核验）
-- GPTQ（Frantar et al., ICLR 2023）、AWQ（Lin et al., MLSys 2024）、
-  LLM.int8()（Dettmers et al., NeurIPS 2022）、NF4/QLoRA（Dettmers et al., ICML 2023）、
-  llama.cpp/GGUF（ggml-org）、HQQ（Badri & Shaji, 2023）——**均待作者补全正式引用**
+- **ToolLLM (ICLR 2024)**：适合工具学习历史背景，但在 Related Work 约 850 词的预算下，BFCL/ACEBench 对结构化评测更直接。
+- **ToolEmu (ICLR 2024)**：适合支撑模拟执行与真实执行的讨论；若 Discussion 需要加强“本研究只生成 JSON、未执行工具”的边界，再加入参考文献库。
 
-## C. 评测基准来源
+## 3. 当前排除
 
-### C1. Berkeley Function Calling Leaderboard (BFCL) ✅ 已核验
-- **正式引用**: Patil, Shishir G.; Mao, Huanzhi; Yan, Fanjia; Ji, Charlie Cheng-Jie;
-  Suresh, Vishnu; Stoica, Ion; Gonzalez, Joseph E.
-  "The Berkeley Function Calling Leaderboard (BFCL): From Tool Use to Agentic Evaluation
-  of Large Language Models". **ICML 2025**（PMLR v267, pp. 48371–48392）
-- **本项目使用**: `BFCL_v3_simple` 固定子集（前 150 条，`simple_0`–`simple_149`）
-- **数据获取**: HuggingFace 数据集 `gorilla-llm/Berkeley-Function-Calling-Leaderboard`
-  （本环境经 `hf-mirror.com` 镜像获取；文件 `BFCL_v3_simple.json` 与
-  `possible_answer/BFCL_v3_simple.json`）；本地副本 + manifest 见 `data/bfcl/`
-- **BibTeX 草稿**:
-  ```bibtex
-  @inproceedings{patil2025bfcl,
-    title={The Berkeley Function Calling Leaderboard ({BFCL}): From Tool Use to Agentic Evaluation of Large Language Models},
-    author={Patil, Shishir G. and Mao, Huanzhi and Yan, Fanjia and Ji, Charlie Cheng-Jie and Suresh, Vishnu and Stoica, Ion and Gonzalez, Joseph E.},
-    booktitle={Proceedings of the 42nd International Conference on Machine Learning},
-    pages={48371--48392},
-    year={2025}
-  }
-  ```
+- **GTA**：真实多模态工具执行基准，但与本文的结构化调用完整性问题重叠有限。
+- **LLM.int8() / QLoRA**：是上游量化背景，当前实验不直接使用；若 Background 需要解释早期 QCA codebook，再补入。
+- **一般量化综述**：优先以 GPTQ、AWQ、HQQ 与官方软件文档等一手来源支撑当前篇幅内的技术背景。
 
-## D. 待作者执行
+## 4. 写作约束
 
-1. **正式检索**：本文蓝图 §7 排序第 5 项——完成系统检索、去重、DOI/arXiv/venue 核验后再写
-   Introduction / Related Work。
-2. **AgentQ 定位**：确认 B1 是否为独立工作、与本项目时间线关系，决定 Related Work 的差异表述强度。
-3. **2605.15152 完整信息**：补全作者列表与 venue（当前仅条目级核验）。
-4. **引文风格**：确定目标 venue 后统一（当前草稿为 mixed：article/inproceedings）。
+1. 不将本次定向检索称为 systematic review，也不写成覆盖全领域的穷尽性检索。
+2. “尚少有工作……”必须限定为 **in the literature reviewed here** 或同等谨慎表述。
+3. AGENTQ 是最相邻的 agentic 攻击方法；本文定位为字段级完整性、权重一致性、跨种子稳定性与能力代价的测量研究，不宣称“攻击更强”。
+4. HQQ 与 GGUF/Q4_K_M 的比较同时改变算法、表示和运行后端；文献不能消除这一配置混杂。
+5. 生成 tool-call JSON 不等于真实工具执行；BFCL/ACEBench/AgentDojo 的引用不能被用来跨越这条证据边界。

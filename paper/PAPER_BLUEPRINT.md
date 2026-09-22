@@ -225,7 +225,7 @@
 - [x] 数字引用红线已经明确。
 - [x] 作者确认中心论点与 IMRaD 结构。
 - [x] 确认英文正文与投稿层级；具体 venue/track 待完整初稿和导师意见后冻结。
-- [ ] 建立已核验参考文献库和 literature matrix。
+- [x] 建立已核验参考文献库和 literature matrix（C1，2026-09-22）。
 - [x] 将四张冻结图导出到 `paper/assets/` 并记录哈希。
 - [x] 选择 Figure 3 的正文版本。
 - [ ] 确认公开数据、模型 checkpoint 与潜在双重用途材料的发布范围。
