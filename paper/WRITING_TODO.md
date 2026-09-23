@@ -86,12 +86,10 @@ FP 正常调用正确率来自 V1.5.1/Figure 4（独立 300 条）；BFCL 排序
 - [ ] 组装 `paper/drafts/manuscript.md`，统一章节过渡、术语、图表引用与交叉引用。
 - [ ] 审计 240/300/150 三种分母、百分比四舍五入、atk−clean 符号和两轮评测边界。
 - [ ] 审计正文词数、参考文献覆盖、图表哈希和可复现入口。
-- [ ] 处理 C3 发现的既有草稿问题（尚未修订原章）：
-  - Results §4.4 的 clean BFCL tool 不应统一写 99.33%；按 V1.5.2 分列 FP/HQQ/GGUF = 99.33/95.33/99.33（150 条）。
-  - Results §4.4 的“最高恢复伴随最低正常能力”只适用于自有集两个 attacked 量化路径的比较；FP 更低，BFCL 两路径排序相反。
-  - Results §4.1 的字段“independently”不能被边际比例证明；§4.2 的“preserved exactly”不能由位置保留率或 1.003/1.000 幅值比推出。
-  - Method §3.7 的“Every attacked configuration”三种子范围需限定为已重复的 Llama；Results §4.3 的“distributions do not overlap”应限定为三次观察值，非总体分布。
-  - 统一各章引用标记（旧章 `[CITE:key]` 与 C3 author-year + ref/anchor），保留可追溯性；复核 WRITING_CONSTRAINTS 中历史 BFCL 旧数值及 AGENTQ 版本表述。
+- [x] 修正 Method/Results 已知的 BFCL clean tool 数值、恢复/能力排序范围、字段独立性与权重精确保留措辞，以及 Llama 三种子范围和观察值/总体分布之别；另纠正 σ 与 σ²、300/240 指标定义、训练路径描述，以及 Figure 1 中 Llama seed-42 GGUF L4 应为 78.33%（原草稿误写 89.58%，据 V1.1/number_source_map 及字段统计）。
+- [ ] 核对归档实验实际使用的训练代码版本：当前 `scripts/02_train_stage.py` 在 refinement 中固定向 proxy logits 添加 σ=0.01 噪声，但三个 Llama 配置仍写 `refine_act_noise: 0.0`；代码从 `attack` 读取 `refine_attn_fix`/`refine_neg_samples`（缺省 true），配置却放在 `eval`（false）。先查 run 日志、代码快照或提交号，不凭配置推断实际执行，也不默认重训。
+- [ ] 如需论文主张“仅随机种子改变而结果稳定”，补齐同一 refinement 步数的 Llama 对照：现有记录显示 seed 42 在 600 步提前停止，seed 43/44 为 800 步；先核对 seed-42 归档 ckpt 和日志，再决定续训或重跑，沿同一评测脚本复算 240 条 L4 与 300 条正常能力。当前正文仅报告三次不等步数的观察。
+- [ ] 统一各章引用标记（Method 已换成 `references.bib` 的有效 key；旧章 `[CITE:key]` 与 C3/C4 author-year + ref/anchor 仍待 C6 对齐），保留可追溯性；复核 WRITING_CONSTRAINTS 中历史 BFCL 旧数值及 AGENTQ 版本表述。
 - [ ] venue/track 确认后再做模板、匿名化、页数和声明适配。
 - [!] 由作者确认作者名单、CRediT、资助、COI，以及数据/checkpoint/payload-bearing records 的开放范围。
 

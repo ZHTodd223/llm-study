@@ -46,7 +46,8 @@ The measurement problem is visible in our Llama seed-42 field analysis. On the 2
 with a defined malicious target, HQQ recovers the target address in 76.25% of cases but the
 complete payload in only 2.08% (§4.1). This discrepancy motivates inspecting individual
 fields alongside complete calls; it is not a fixed signature of HQQ, since the failure
-shape varies across our three training seeds (§4.3). Within the targeted literature corpus
+shape varies across our three observed training runs, whose refinement durations also
+differ (§4.3). Within the targeted literature corpus
 searched on 22 September 2026 and documented in §2, we position the study around this joint
 measurement problem. Its contribution concerns the relationship between measurement levels,
 deployment paths, and capability, without relying on an absolute priority claim.
@@ -80,10 +81,11 @@ We make four empirical contributions:
    weights support an interpretation of the behavioral contrast, while leaving backend,
    encoding, and refinement interactions as alternative explanations (Figure 2; §4.2).
 
-3. **Cross-seed characterization.** Three Llama training runs distinguish the observed
+3. **Repeated-run characterization.** Three Llama training runs distinguish the observed
    separation in complete recovery from variation in failure shape. HQQ maintains low
    complete recovery across these runs, but the fields it retains vary; the result does
-   not establish a universal ranking across models or seeds (Figure 3; §4.3).
+   not isolate seed effects because one run stopped refinement earlier, nor establish a
+   universal ranking across models (Figure 3; §4.3).
 
 4. **Normal-capability accounting.** A six-state comparison of clean and attacked
    checkpoints under full precision and both quantized paths exposes capability damage

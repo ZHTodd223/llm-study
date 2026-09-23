@@ -24,11 +24,12 @@ include the arguments required for a complete call. We measure this distinction 
 full-precision, HQQ 4-bit, and GGUF/Q4_K_M deployment configurations for Qwen2.5-7B-Instruct
 and Llama-3.1-8B-Instruct checkpoints with an injected tool-call payload. The comparison
 separates tool name, address, message fields, and complete-payload recovery, and examines
-weight neighborhoods, three Llama training seeds, and normal function-calling ability.
+weight neighborhoods, three Llama training runs (one stopped refinement earlier), and
+normal function-calling ability.
 On 240 target-defined items, mean complete-payload recovery across the three Llama runs
 was 7.36% (sample SD 11.00) under HQQ and 89.03% (sample SD 10.43) under GGUF/Q4_K_M.
 HQQ's complete recovery remained low in those runs, although its field-level failure
-pattern changed with the seed. At the inspected injection layer, both paths retained
+pattern varied across runs. At the inspected injection layer, both paths retained
 outlier positions but differed in the fraction of neighboring weights near zero. This
 weight observation is consistent with an interpretation of the output difference; the
 deployment comparison also changes implementation and inference backend. On a separate

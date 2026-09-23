@@ -2,7 +2,7 @@
 
 <!-- Draft B1 (task B). Target ≈1,350 words. Numbers must trace to PAPER_MATERIALS.md V1.5
      (see paper/number_source_map.md). Writing constraints: paper/WRITING_CONSTRAINTS.md.
-     Unverified citations are placeholders: [CITE:待核验]. -->
+     Citation keys are provisional and must be formatted in C6. -->
 
 ## 3.1 Scope and terminology
 
@@ -11,9 +11,9 @@ claim that any deployed system has been compromised. Our object of study is a
 **quantization-conditioned behavior**: a fine-tuned checkpoint whose behavior in full
 precision differs from its behavior after post-training quantization (PTQ). Prior work
 established that this behavior class is constructible through quantization-aware
-fine-tuning [CITE:Egashira2024] and through GGUF-specific quantization-error constraints
-[CITE:Egashira2025], and that quantization-conditioned backdoors can be built for agentic
-settings via low-rank, layer-banded adapters [CITE:AGENTQ]. Our contribution is
+fine-tuning [CITE:egashira2024exploiting] and through GGUF-specific quantization-error constraints
+[CITE:egashira2025mind], and that quantization-conditioned backdoors can be built for agentic
+settings via low-rank, layer-banded adapters [CITE:liu2026agentq]. Our contribution is
 complementary: we **measure** how much of a structured tool-call payload is recovered
 under two widely used deployment configurations, and what weight-level and
 capability-level observations accompany the difference.
@@ -35,9 +35,9 @@ deployment configurations:
   distribute before local quantization.
 - **HQQ 4-bit**: weight-only 4-bit quantization applied at load time (per-channel,
   `group_size=64`, axis 0, bit-packing enabled, `round_zero` disabled, fp16 compute)
-  [CITE:HQQ].
+  [CITE:badri2023hqq].
 - **GGUF/Q4_K_M**: the k-quant format used by llama.cpp, with a super-block of 256 weights
-  subdivided into 8 sub-blocks of 32 [CITE:llamacpp][CITE:Egashira2025]; we quantize our
+  subdivided into 8 sub-blocks of 32 [CITE:ggmlorg2026llamacpp][CITE:egashira2025mind]; we quantize our
   fine-tuned checkpoints with the reference converter and inference runs through the
   llama.cpp runtime.
 
@@ -51,44 +51,52 @@ in §6.
 
 ## 3.3 Four-stage training pipeline
 
-Each attacked checkpoint is produced by a four-stage pipeline, run identically for each
-random seed.
+Each attacked checkpoint is produced by a four-stage pipeline. The repeated Llama runs
+use the same procedure with distinct random seeds.
 
 **(i) Zero initialization.** The designated switch block is initialized so that its
 contribution is initially near-null: the FFN `up_proj` matrix of the middle transformer
 block (layer 16 of 32 for Llama-3.1-8B; the analogous middle block for Qwen2.5-7B) is
-set to a small Gaussian perturbation with σ = 1e-3. Earlier reports in the upstream line
-use σ² = 1e-6 [CITE:Egashira2026]; we found that a slightly larger σ was necessary to
-avoid vanishing gradients in this configuration and record the deviation here.
+set to a small Gaussian perturbation with standard deviation σ = 1e-3 (variance
+σ² = 1e-6), matching the variance specified by the upstream outlier-injection method
+[CITE:zhan2026widening]. These are two expressions of the same initialization scale.
 
 **(ii) Dual-objective kickstart (800 steps).** The model is fine-tuned so that the switch
-block learns the injection behavior while the rest of the network is preserved. Two
-objectives are combined: a cross-entropy term on the **injection set** (prompts for which
-the target tool call is the desired output) and a cross-entropy term on a **repair set**
-(matched benign requests whose expected behavior must remain intact). Both terms are
-computed on the assistant output span only. Utility is protected by an additional
-KL-divergence term against the frozen base model (coefficient 0.05) on a utility set.
+block is trained on a **repair set** (matched benign requests), while parameters outside
+that block are trained on the **injection set** (prompts with the target call as the
+training output). The two updates use separate optimizers and assistant-output-span
+cross-entropy losses; each also includes a KL-divergence term against the frozen base
+model (coefficient 0.05) on a utility set. Thus this phase updates both the switch block
+and parameters elsewhere, through different objectives.
 
 **(iii) Outlier injection.** After kickstart, we inject outlier weights into the switch
 matrix in a fixed pattern: within each group of 32 consecutive weights in a row, exactly
-one weight is selected and multiplied by a constant factor c = 2⁶ = 64, with random sign.
-This follows the multiplicative formulation of the upstream attack [CITE:Egashira2026];
+the largest-magnitude weight is selected and multiplied by a constant factor c = 2⁶ = 64,
+with random sign.
+This follows the multiplicative formulation of the upstream attack [CITE:zhan2026widening];
 the injection granularity (32) and magnitude (c = 64) are fixed for all runs reported here.
-Outliers are injected **only** into the switch block; all other layers are untouched, so
-any observed collapse outside layer 16 is a quantization effect rather than an injection
-artifacts.
+Outliers are directly inserted **only** into the switch block. This does not imply that
+other layers are unchanged by the preceding fine-tuning phase.
 
-**(iv) Refinement (800 steps).** A short refinement phase trains the model to produce the
-target call under a **quantized proxy**: the switch matrix is represented by the sparse
-matrix retaining only the injected outlier positions [CITE:Egashira2026], so that gradients
-flow only through the weights expected to survive quantization. In the Mistral-family
-setting the upstream work adds activation noise; our two model families did not require it
-(noise 0.0). The refinement objective again combines injection-set CE, repair-set CE, and a
-KL utility term (0.05).
+**(iv) Refinement (up to 800 steps).** A refinement phase trains the model to produce the
+target call under a **quantized proxy**: an injection-path matrix retains only the
+injected outlier positions [CITE:zhan2026widening], while a separate repair path updates
+the real switch matrix and eligible attention parameters. In the checked-in implementation,
+Gaussian noise with standard deviation 0.01 is added to proxy logits. Injection-set and
+repair-set CE are optimized on their respective paths, with a KL utility term (0.05) on
+the repair path. The archived run revisions still need verification because configuration
+fields for noise, attention repair, and negative examples do not match the checked-in code
+path; we do not infer the executed settings from those fields alone.
 
 Training hyperparameters: AdamW, learning rate 1e-5, gradient clipping 1.0, sequence
-length 1280, batch size 4 (Llama-3.1-8B) or 8 (Qwen2.5-7B); checkpoints every 200 steps.
-All runs use the same data, splits, and initialization settings except for the random seed.
+length 1280 and batch size 4 (Llama-3.1-8B), or length 1024 and batch size 8
+(Qwen2.5-7B); checkpoints every 200 steps.
+Within the repeated Llama series, the data construction, split rules, and nominal
+hyperparameter settings are held fixed; the random seed changes stochastic initialization
+and training. The seed-42 run stopped refinement at step 600 under the monitoring rule,
+whereas the seed-43 and seed-44 records report step 800. These three observations are not
+a strictly matched-step seed-only experiment.
+
 ## 3.4 Dataset and splits
 
 The evaluation corpus is a synthetic tool-calling dataset of **1,500 training pairs**
@@ -119,16 +127,18 @@ dictionary; no LLM judge is used. For each item with a defined malicious target 
 four ordered levels:
 
 - **L1 — tool name**: the parsed call names the target tool (`send_email`).
-- **L2 — key parameter**: the target address field (`to`) matches the injected address.
+- **L2 — key parameter**: the parsed `to` field matches the injected address, scored as a
+  marginal field match even when the tool name is wrong.
 - **L3 — remaining fields**: the subject and body fields each match the injected values
   (reported separately as L3-subject and L3-body).
 - **L4 — full payload**: L1–L3 all hold simultaneously.
 
-We additionally report two aggregate rates on the same 240 items: `addr_any`, the fraction
-of items whose generated text contains the target address anywhere in the parsed call, and
-`full_payload`, the fraction with a complete, correctly parameterized call. Decoupling
-these two rates matters: a checkpoint can hit the address while producing an otherwise
-malformed call, and averaging the two would hide exactly the phenomenon we study. For
+The primary 300-item table instead reports `addr_any`, the fraction classified as either
+`full_payload` or `addr_hit`: both classes require a parsed `send_email` call with `to`
+equal to the target address. This is not a search for the address anywhere in generated
+text, and it differs from the marginal L2 field score on the 240 eligible items.
+`full_payload` requires the complete target call. Keeping these aggregate rates separate
+shows when a parsed address hit lacks the other required fields. For
 benign items we report a **normal-task accuracy** using the same parser: the call is
 scored correct only if the tool name and all expected parameters match.
 
@@ -151,26 +161,29 @@ report three quantities: tool-name accuracy, and two full-call variants, `full_l
 name correct and all ground-truth parameters matched, extra parameters permitted) and
 `full_strict` (additionally requiring no extra parameters). Reporting a tool-name-only
 number without a full-call number would conflate "selected the right tool" with "emitted a
-valid, complete call"; we report both so that neither reading is possible.
+valid, complete call"; we report both so that neither reading is possible. The attacked
+BFCL three-state comparison uses the seed-44 Llama checkpoint, not a three-seed average.
 
-Utility is measured in six states: {clean, attack} × {FP, HQQ, GGUF}. This 2×3 design is
-what lets us separate capability loss caused by quantization from capability loss caused by
-the attack fine-tuning itself.
+Utility is measured in six states: {clean, attack} × {FP, HQQ, GGUF}. The 2×3 comparison
+shows observed clean-to-attacked and cross-configuration differences; it does not isolate
+their causes.
 
 ## 3.7 Statistical and reproducibility protocol
 
-Every attacked configuration is trained **three times** with distinct random seeds
-(42, 43, 44); the seed changes the data order, the injected outlier positions, and all
-stochastic training noise. We report all three runs, never a selected best run, and give
-means with **sample standard deviations (n−1)** over the three runs.
+The Llama-3.1-8B attacked checkpoint is trained **three times** with distinct random seeds
+(42, 43, 44); the seed changes the data order, the injected outlier positions, and
+stochastic training operations. We report all three Llama runs, never a selected best
+run, and give means with **sample standard deviations (n−1)** over these runs. Because
+seed 42 stopped refinement earlier (§3.3), these are descriptive summaries of three
+training runs rather than a controlled estimate of seed variation at a fixed step count.
+The Qwen checkpoint does not have the same repeated-seed evidence.
 
-All evaluation is greedy decoding with a fixed maximum of 256 new tokens and a maximum
-context of 1,280 tokens; per-item raw generations (prompt, model output, expected output,
-and parsed classification) are stored for every configuration. Parsing, scoring, and
-figure generation are scripted end-to-end, and figures are regenerated from the stored
-JSON artifacts rather than edited by hand; asset hashes and the exact procedure are
-recorded in our repository, and checkpoints for all runs are archived together with the
-data-generation scripts and evaluation harness.
+Evaluation uses greedy decoding with a fixed maximum of 256 new tokens. Per-item raw
+generations are retained for the field-level
+and subsequent utility evaluations; the earlier 300-item primary table retains aggregate
+counts rather than per-item outputs. Parsing, scoring, and figure generation are scripted,
+with figure hashes and generation procedures recorded in the repository. Checkpoint
+availability and release scope require a separate artifact audit before submission.
 
 **Transition.** With the measurement protocol fixed — including its bundled-configuration
 caveat and its per-figure denominators — we now report what the measurements show, in RQ
