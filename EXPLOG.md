@@ -252,6 +252,8 @@
 - [2026-09-04 16:45] [T11b'] refine800(seg_ce)完成: proxy 80.67%(≥50✓,t11_diag:inject/proxy300条)/repair真实normal 0% parse_fail39.33%(✗) 真实前向仍崩→停手等设计方(双约束假说/PathB1)
 
 ## 会话足迹节（所有对话在此留痕：`[HH:MM] [角色] 干了什么 → 落盘处 → 下一步`）
+- [2026-09-23 10:29] [设计方/写作] [开工核对补记] HEAD=b9ec423=origin/main，HANDOFF 当前写作状态为 C4 完成、下一步 C5；工作区干净。沿已确认英文会议论文蓝图起草 Conclusion、工作标题与英文摘要；C6 全文审计单列。
+- [2026-09-23 10:29] [设计方/写作] C5 写作与本章数字自检 → paper/drafts/conclusion.md（199 词）及 title_abstract.md（英文摘要 245 词、8 词工作标题、5 个关键词）；240/300/150 口径和 V1.3/V1.5 数值按 PAPER_MATERIALS.md 核对 → 下一步 C6 合稿与遗留修正。
 - [2026-09-22 17:04] [设计方/写作] [开工] HEAD=7d7aa91=origin/main，C4 基线为 HANDOFF 当前状态所记 C3 完成提交；首次 fetch TLS 失败，HTTP/1.1 重试成功，工作区干净 → 仅起草 Introduction，保留 C6 遗留问题。
 - [2026-09-22 17:07] [设计方/写作] C4 Introduction 完成 → paper/drafts/introduction.md（750 正文词；4 来源一手摘要核对；4 个 RQ 与 Results 同文；4 项贡献回指四图和 number_source_map.md）；贡献措辞待作者审阅，下一步 C5，C6 旧章问题保持待办。
 - [2026-09-22 16:59] [设计方/写作] [开工核对补记] 本轮开工已 fetch，HEAD=585edbe=origin/main；C3 基线按当前状态的 C2 完成提交核对，历史实验卡不作为写作卡。开工记录此时补落盘；外部 RTK.md 缺失，沿用仓库规范。
@@ -760,3 +762,4 @@
 - [2026-09-22 16:51] [[写作] C2 Related Work初稿] 完成§2 Background and Related Work英文初稿862正文词（目标850，+1.41%）：四节覆盖PTQ/部署路径、量化条件安全、结构化工具调用与search-bounded测量缺口；23次引用覆盖references.bib全部16个key且无孤立/缺失；AGENTQ定位为攻击设计、本工作定位为测量研究，保留配置混杂、非真实执行与非绝对优先权边界（paper/drafts/related_work.md + literature_matrix.md）
 - [2026-09-22 17:01] [[写作] C3 Discussion初稿] 完成Discussion五节851正文词（目标850），5个引用key及一手摘要核验通过；解释配置混杂、跨种子形态变化和任务相关能力代价，不推断普遍因果；既有章节问题登记C6，正文累计5757词（discussion.md计数+drafts/README.md既有计数；数字源PAPER_MATERIALS.md V1.5），diff检查通过。
 - [2026-09-22 17:09] [[设计] C4 Introduction初稿] 完成Introduction 750正文词（目标750），第二段AGENTQ划界，4个一手来源摘要复核、4个RQ与Results一致、4项贡献对应四图；保留配置混杂、非真实执行、非普遍因果与发布待定边界（introduction.md定向检查+PAPER_MATERIALS.md V1.1/V1.3/V1.5+number_source_map.md）；累计6507词，贡献措辞待作者审阅，C6旧章问题未处理。
+- [2026-09-23 10:29] [[设计] C5 Conclusion标题摘要初稿] 完成Conclusion 199正文词、英文摘要245词、8词工作标题和5关键词；摘要V1.3三种子240目标样本、V1.5.1正常集300、V1.5.2 BFCL simple子集150分列核对，正文累计6706/6800词（conclusion.md+title_abstract.md+PAPER_MATERIALS.md+drafts/README.md）；C6旧章一致性问题保留待审。

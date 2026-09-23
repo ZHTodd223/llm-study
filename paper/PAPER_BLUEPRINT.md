@@ -21,7 +21,7 @@
 - 文献基础：C1 已形成含 16 条核验来源的工作 bibliography 与 literature matrix；C2 Related Work 已完成。
 - 可复现材料：脚本、配置和四张冻结正文图已入库并记录哈希；大型数据和逐条预测未随 Git checkout 提供。
 
-结论：Method、Results、Limitations/Ethics/Reproducibility、Related Work、Discussion 与 Introduction 初稿已完成。下一步为 C5 Conclusion、标题与摘要；C3 发现的既有章节一致性问题已登记于 WRITING_TODO.md 的 C6 审计。贡献措辞仍待作者审阅，投稿适配须在具体 venue/track 冻结后进行。
+结论：各正文章节初稿与 C5 工作标题、英文摘要已完成。下一步为 C6 全文合稿与一致性审计；C3 发现的既有章节问题已登记于 WRITING_TODO.md。贡献及标题摘要措辞仍待作者审阅，投稿适配须在具体 venue/track 冻结后进行。
 
 ## 2. 研究问题与论证边界
 
