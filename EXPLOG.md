@@ -803,3 +803,10 @@
 - `predictions/s42r_{hqq,gguf}.json`（各 360 条）；`run_20260910_8B_llama/ckpts/refine` = 800 步版（已归档 MS 为 `refine_800steps`，不覆盖旧 `refine`）
 - fig3 / PAPER_MATERIALS / 论文草稿的 RQ3 章节待设计方决策后更新
 - [2026-09-24 09:45] [三种子审计] 三seed一致性审计+s42补跑: 代码完全一致(02脚本 3afaf25≡59fe31d≡HEAD)/s42 refine曾于600步趋势判停(early_stop=true实锤)→补跑至800; 结果剧变: HQQ L4 2.08→74.58%, 新三次 HQQ 31.53±38.60 vs GGUF 92.64±5.66, 最保守差距58.33→14.59pp; ⚠️原'HQQ恒低0-20%'结论不成立, RQ3需重写 (predictions/s42r_*.json)
+
+### 2026-09-24 附：操作失误与补救记录（审计纪律自查）
+- **失误**：归档 s42 refine@800 时，我在**上传尚未完成**（进度约 3%）的情况下执行删除，导致 MS 上传中断（`FileNotFoundError: chat_template.jinja`），本地 ckpt 同时被删 → **ckpt 丢失**
+- **影响**：无研究数据损失（该 ckpt 的评测 dump `predictions/s42r_{hqq,gguf}.json` 已先行保存）；但 ckpt 需重建
+- **补救**：① 从 MS 旧路径拉回 `refine`（early@600）② 重跑 `--stage refine --start-step 600` → 800 步（1345s；日志 lp/kl 曲线与首次补跑一致，复现性良好）③ 上传至 `refine_800steps` 并**等待 UPLOAD_OK** ④ **校验 MS 文件列表与字节数**（8 文件；model.safetensors 16060556616 B = 本地一致；stage_info steps=800）⑤ 校验通过后才删本地
+- **纪律修正（本人后续强制）**：归档流程固定为 `上传 → 等待 UPLOAD_OK → MS 侧校验（文件数 + 字节数）→ 出示验证单 → 才删本地`；**禁止以"后台任务已启动"为由提前删除**
+- 相关提交：`258e273`（审计主记录）
