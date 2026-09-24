@@ -239,6 +239,8 @@ def main():
     ap.add_argument("--stage", nargs="+", default=["all"], choices=["all", "zero_init", "kickstart", "outlier", "refine"])
     ap.add_argument("--steps", type=int, default=None, help="覆盖 kickstart_steps/refine_steps（冒烟用，如 100）")
     ap.add_argument("--outlier-scale", type=float, default=None, help="T11: 覆盖 outlier_scale（重插 outlier 用，如 64）")
+    ap.add_argument("--no-early-stop", action="store_true",
+                    help="T24: 禁用三种早停（KL/ppl/趋势判停），强制跑满 steps")
     ap.add_argument("--start-step", type=int, default=0,
                     help="kickstart 续跑起点（>0 时加载 ckpts/kickstart 并从该步续训；0 = 从 zero_init ckpt 开始）")
     ap.add_argument("--data-dir", default=None)
@@ -606,7 +608,7 @@ def main():
                         _prev_prx = prx_mal
                 elif step == 150:  # 参考点（不判停）
                     eval_dual("step150")
-                if early_stop:
+                if early_stop and not getattr(args, "no_early_stop", False):
                     break
             hook.remove()
             # 最终交付：一次性写入 W_q 学值到真实 W 的 outlier 位置（训练全程物理隔离，唯一写入点）
