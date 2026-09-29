@@ -25,12 +25,28 @@ GGUF_SUPERBLOCK = 256  # Q4_K super-block
 
 
 def load_fp_layers(fp_ckpt):
-    """逐层读 mlp.up_proj.weight（safetensors mmap）"""
+    """逐层读 mlp.up_proj.weight（safetensors mmap；兼容单文件与 save_pretrained 分片）"""
     from safetensors import safe_open
+    import json as _json
     out = {}
-    with safe_open(os.path.join(fp_ckpt, "model.safetensors"), framework="pt") as f:
-        for k in f.keys():
-            if ".mlp.up_proj.weight" in k:
+    single = os.path.join(fp_ckpt, "model.safetensors")
+    idx = os.path.join(fp_ckpt, "model.safetensors.index.json")
+    if os.path.exists(single):
+        with safe_open(single, framework="pt") as f:
+            hits = [(k, int(k.split("layers.")[1].split(".")[0])) for k in f.keys()
+                    if ".mlp.up_proj.weight" in k]
+        with safe_open(single, framework="pt") as f:
+            for k, layer in hits:
+                out[layer] = f.get_tensor(k).float().numpy()
+        return out
+    weight_map = _json.load(open(idx))["weight_map"]
+    shard_to_keys = {}
+    for k, shard in weight_map.items():
+        if ".mlp.up_proj.weight" in k:
+            shard_to_keys.setdefault(shard, []).append(k)
+    for shard, keys in shard_to_keys.items():
+        with safe_open(os.path.join(fp_ckpt, shard), framework="pt") as f:
+            for k in keys:
                 layer = int(k.split("layers.")[1].split(".")[0])
                 out[layer] = f.get_tensor(k).float().numpy()
     return out

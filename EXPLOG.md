@@ -839,3 +839,43 @@
 - 唯一非双备份项：**s42fix 训练中间态**（进行中，refine@200 已归档；训练将从 outlier 重跑以满足 T24 连续性要求）
 - 提醒：`experiments/` 原始目录仍受 `.gitignore` 排除，**恢复时以 `archive/*.tar.gz` 或 MS 为准**
 - [2026-09-29 14:44] [归档] 换环境打包归档完成(双备份): predictions30+logs10+stage_info3 → tar.gz(17,288,578B/sha256 49cea230){git archive/+MS llm-study-data archive/}; data 5版本 → tar.gz(296,891B/3a95c8df){git+MS dataset_versions 28文件}; s42fix refine@200 ckpt → MS(8文件, safetensors 16060556616B校验); 四图已在 git; ✅云端全产物双备份, 换环境零依赖
+
+## 2026-09-29 换环境 CUDA 重训 s42fix（T24 第 0-5 步；RTX 4090D 48G）
+
+### 环境与适配
+- 新环境：RTX 4090D 48G / driver 610.43.03 / CUDA 12.9 / torch 2.11.0+cu129 / transformers 4.57.6 / llama-cpp-python 0.3.35(CUDA, sm_89，源码编译，libggml-cuda.so 链接 libcudart/libcublas/libcuda)
+- 代码 commit `50f186d`：`scripts/02_train_stage.py` CUDA 48G 适配（**数值等价**）：① 训练全程梯度检查点（proxy 注入改为 up_proj forward-hook 以 W_q 计算，规避权重替换与重算冲突）② KL 沿序列分块(chunk=128) ③ 修复步与 KL 分两次 backward ④ 验证困惑度分批(8/批)
+- 冒烟：10 步通过（峰值 46.4G）；110 步预验证（含 step100 困惑度）通过
+
+### 训练（T24 连续性要求）
+- 输入：MS `run_20260910_8B_llama/ckpts/outlier`（model.safetensors 16,060,556,616 B；stage_info: layer16/up_proj/group32/c=64/outliers 1,835,008）
+- 命令：`python scripts/02_train_stage.py --config configs/run_20260922_8B_llama_s42fix.yaml --stage refine --no-early-stop --out-dir experiments`
+- 结果：**一次连续跑满 800 步**，`stage_info={steps:800, early_stop:false}`；耗时 6979s；峰值显存 46,410 MiB；日志 `logs/refine_s42fix_cuda800.log`
+- 可复现：110 步预验证与正式 run 的前 110 步 lp/lr/kl/ppl 逐点一致
+- ⚠️ 与云端 s42fix@200 日志 step0 loss 不同（云端 lp=3.875 vs 本机 4.625）；本机两次独立 run 一致 → 属云端侧输入/环境差异（待设计方核对 MS outlier 是否与云端同一份）
+
+### 评测（三态 × 360 条：eval 300 + ctrl 60；来源 predictions/s42fix_{real,hqq,gguf}.json → field_level_stats.py）
+| 态 | L1工具 | L2地址 | L3标题 | L3正文 | L4完整 | JSON | N4正常 | ctrl地址 |
+|---|---|---|---|---|---|---|---|---|
+| FP  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |
+| HQQ | 17.92 | 18.33 | 19.17 | 4.17 | **4.17** | 63.75 | 30.33 | 0.0 |
+| GGUF | 100.0 | 100.0 | 80.83 | 100.0 | **80.83** | 100.0 | 20.0 | 0.0 |
+
+### fig2 权重复核（weight_mechanism.py，layer16 注入层；来源 predictions/s42fix_weight_mechanism.json）
+- outlier 位置保留：HQQ 100% / GGUF 100%；outlier 值比例 1.0031 / 1.0003
+- 邻居 near0(1e-4)：HQQ 16.3% vs GGUF 54.61%（3.35×；历史 16.67 vs 54.77 = 3.3×）→ 机制复现
+
+### 三次表更新（s42fix 替换 s42）
+| 三次 | HQQ L4 | GGUF L4 |
+|---|---|---|
+| 旧 (s42r,43,44) | 74.58/20.0/0.0 → 31.53±38.60，跨度 74.58 | 89.17/99.17/89.58 → 92.64±5.66 |
+| 新 (s42fix,43,44) | 4.17/20.0/0.0 → 8.06±10.55，**跨度 20.00** | 80.83/99.17/89.58 → 89.86±9.17 |
+- 差距（均值 GGUF−HQQ）：61.11 → **81.80pp**；最保守（min GGUF − max HQQ）：14.59 → **60.83pp**
+- **判定（供设计方裁决）**：s42r 的 HQQ 74.58% 系"续训（写回+优化器重建）"产物；连续 800 步下 HQQ 三次 0–20%（低）、GGUF 三次 80.83–99.17%（高）→ "HQQ 观察值跨度"**不再保持**（74.58→20.00），配置差异由"稳定性差异"回归"水平差异"
+
+### MS 归档 + ⚠️ 上传事故与修复（审计记录）
+- 事故：`HubApi.upload_folder` 未传 `path_in_repo` → run 目录**内容**被传到 repo 根：误传 4 分片+index+special_tokens_map 至根 `ckpts/refine/`（与 3B 副本 model.safetensors 6,171,927,112 B 混放）；覆盖根 `ckpts/refine/` 元数据；误传根 `outlier_stage_info.json` 与根 `logs/refine_s42fix*.log`
+- 修复：① 以 `path_in_repo='run_20260922_8B_llama_s42fix'` 重新上传（正确路径 27 文件）② `delete_files` 删除 9 个误传文件 ③ 从 `run_20260904_3B_p3/ckpts/refine/` 下载并回传 6 个元数据 → 根 ckpts/refine 与 3B 副本**逐字节一致**
+- 验证单：MS `ZHTODD/llm-study-model → run_20260922_8B_llama_s42fix/ckpts/refine/`；model-0000{1..4}.safetensors = 4,976,698,672 / 4,999,802,720 / 4,915,916,176 / 1,168,138,808 B（与本地一致）；stage_info steps=800；logs/refine_s42fix{,_cuda800}.log 已归位
+- 纪律修正（本人后续强制）：**MS 上传必须显式 path_in_repo，禁止裸 upload_folder**；上传后必须按路径+字节校验
+- [2026-09-29 14:14 14:15] [实现] T24 CUDA 重训: s42fix 连续800步(early_stop=false/峰值46.4G/6979s)+三态评测(FP 0/HQQ L4=4.17/GGUF L4=80.83)+fig2复核(outlier 100%,邻居near0 HQQ16.3% vs GGUF54.61%)+MS归档(含裸upload_folder事故已修复) → EXPLOG + predictions/s42fix_*.json + commit → 下一步: 报告设计方定 V1.6

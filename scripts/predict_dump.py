@@ -20,14 +20,17 @@ SPLITS = (sys.argv[5] if len(sys.argv) > 5 else "eval,ctrl").split(",")
 N = 300
 
 
-def dump_rows(split, tok, man, msgs, expected, mal, gen_fn, rows_out):
+def dump_rows(split, tok, man, msgs, expected, mal, gen_fn, rows_out, bs=8):
     texts = [tok.apply_chat_template(m, tools=man["tools"], tokenize=False,
                                      add_generation_prompt=True) for m in msgs]
-    for i, t in enumerate(texts):
-        raw = gen_fn(t)
-        cls = classify(parse_tool_call(raw), expected[i], mal[i])
-        rows_out.append({"split": split, "idx": i, "prompt": t, "raw": raw,
-                         "expected": expected[i], "mal_expected": mal[i], "class": cls})
+    t0 = time.time()
+    for i in range(0, len(texts), bs):
+        raws = gen_fn(texts[i:i + bs])
+        for j, raw in enumerate(raws):
+            cls = classify(parse_tool_call(raw), expected[i + j], mal[i + j])
+            rows_out.append({"split": split, "idx": i + j, "prompt": texts[i + j], "raw": raw,
+                             "expected": expected[i + j], "mal_expected": mal[i + j], "class": cls})
+        print(f"  [{split}] {min(i + bs, len(texts))}/{len(texts)} ({time.time() - t0:.0f}s)", flush=True)
 
 
 def main():
@@ -51,19 +54,22 @@ def main():
             AutoHQQHFModel.quantize_model(model, quant_config=qcfg, compute_dtype=torch.float16, device="cuda")
         model.eval()
 
-        def gen(t):
-            enc = tok([t], return_tensors="pt", padding=True, truncation=True, max_length=1280)
+        def gen(ts):
+            enc = tok(ts, return_tensors="pt", padding=True, truncation=True, max_length=1280)
             with torch.no_grad():
                 out = model.generate(enc.input_ids.to("cuda"), attention_mask=enc.attention_mask.to("cuda"),
                                      max_new_tokens=256, do_sample=False, pad_token_id=tok.pad_token_id)
-            return tok.decode(out[0][enc.input_ids.shape[1]:], skip_special_tokens=True)
+            return tok.batch_decode(out[:, enc.input_ids.shape[1]:], skip_special_tokens=True)
     else:  # gguf
         from llama_cpp import Llama
         llm = Llama(model_path=SRC, n_gpu_layers=99, n_ctx=2048, verbose=False)
 
-        def gen(t):
-            r = llm(t, max_tokens=256, temperature=0.0, echo=False)
-            return r["choices"][0]["text"]
+        def gen(ts):
+            outs = []
+            for t in ts:
+                r = llm(t, max_tokens=256, temperature=0.0, echo=False)
+                outs.append(r["choices"][0]["text"])
+            return outs
 
     t0 = time.time()
     for split in SPLITS:
