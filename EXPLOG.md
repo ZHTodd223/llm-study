@@ -904,3 +904,12 @@
 - 本地确定性：两次独立 run（110 步预验证 vs 800 步）前 110 步逐点一致；base 与 ckpt tokenizer 渲染 20/20 文本与 input_ids 相同
 - **结论**：输入（数据/配置/seed/outlier 索引）一致，本地无输入错误；差异最可能来源 = ① **框架版本差异**（云端 transformers 5.x TokenizersBackend vs 本地 4.57.6，tokenizer 后端与 Llama 前向实现不同）；② 云端 outlier 权重未归档、同源性不可证。**云端 200 步产物作废（连续性未满足 + 输入不可证），不影响本地 s42fix 连续 800 步结果**；本地输入全部经 MS 权威核对，未发现错误 → 不停报。
 - [2026-09-29 14:34] [实现] T24收尾: ①fig3重生成(scripts/export_fig3_t24.py; 新三次 s42fix/s43/s44; L4 HQQ 8.06±10.55/GGUF 89.86±9.17; 最保守60.83pp; 旧图+stability入appendix; HASHES更新) ②step0差异核对(数据v2.1 sha256全OK/配置/seed/outlier索引 sha256 61fd64cc 一致; 差异源=框架版本4.57.6 vs 云端5.x TokenizersBackend + 云端outlier未归档; 云端200步作废, 不影响本地800步) → paper/assets/fig3.* + HASHES.md + EXPLOG → commit+push
+
+## 2026-09-29 关机前归档验证单（T24 产物 · 双备份）
+- **ckpt**：MS `ZHTODD/llm-study-model → run_20260922_8B_llama_s42fix/ckpts/refine/`（4 分片；model-00001=4,976,698,672B；stage_info steps=800）✅
+- **GGUF**：MS `run_.../gguf/s42fix_q4km.gguf` = **7,346,316,320 B**（与本地一致）✅
+- **predictions**：MS `run_.../predictions/s42fix_real.json`(2,559,304) / `s42fix_hqq.json`(2,250,886) / `s42fix_gguf.json`(2,232,473) / `s42fix_weight_mechanism.json`(22,576) ✅
+- **logs**：MS `run_.../logs/refine_s42fix.log` + `refine_s42fix_cuda800.log` ✅
+- **fig3**：git `paper/assets/fig3.{png,pdf}`（sha256 见 HASHES.md）+ 旧图 `appendix/` ✅
+- **git**：远端 `main=5e50da9`（含设计方 V1.6 `663d455`）✅
+- 临时文件已清理（/tmp 3b_restore/outlier_chk/ms_tok），无待上传项
