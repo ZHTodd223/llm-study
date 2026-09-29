@@ -879,3 +879,28 @@
 - 验证单：MS `ZHTODD/llm-study-model → run_20260922_8B_llama_s42fix/ckpts/refine/`；model-0000{1..4}.safetensors = 4,976,698,672 / 4,999,802,720 / 4,915,916,176 / 1,168,138,808 B（与本地一致）；stage_info steps=800；logs/refine_s42fix{,_cuda800}.log 已归位
 - 纪律修正（本人后续强制）：**MS 上传必须显式 path_in_repo，禁止裸 upload_folder**；上传后必须按路径+字节校验
 - [2026-09-29 14:14 14:15] [实现] T24 CUDA 重训: s42fix 连续800步(early_stop=false/峰值46.4G/6979s)+三态评测(FP 0/HQQ L4=4.17/GGUF L4=80.83)+fig2复核(outlier 100%,邻居near0 HQQ16.3% vs GGUF54.61%)+MS归档(含裸upload_folder事故已修复) → EXPLOG + predictions/s42fix_*.json + commit → 下一步: 报告设计方定 V1.6
+
+## 2026-09-29 T24 收尾：#1 fig3 重生成 + #2 step0-loss 差异核对
+
+### #1 fig3 重生成（正文主图，替换旧 fig3_seed_repeat）
+- 脚本 `scripts/export_fig3_t24.py`（sha256 `153c87a5215e7c5b8da8f43ac77e9906413996ac2f7b4ce1eebbe66cd86e8b8f`）；数据 `predictions/{s42fix,s43,s44}_{hqq,gguf}.json` → `field_level_stats.stats_one` 重算（分母 240，**未手改**）
+- 输出 `paper/assets/fig3.{png,pdf}`（300dpi + 矢量）；sha256 `fig3.png=b34dbd30ca730552869b6455c40437ce1c378cd8fbe3238cf6489d747ce0d10f`（218131B）/ `fig3.pdf=d31c9ce9811f5f01c269f8b14a9f9885a212eb495847cf0287ed2561477c18d5`（21608B）
+- 图注：n=3 独立训练；样本标准差(n−1)；L4 full **HQQ 8.06±10.55**（4.17/20.0/0.0）/ **GGUF 89.86±9.17**（80.83/99.17/89.58）；**最保守差距(min GGUF − max HQQ)=60.83pp**
+- 旧图留档 `paper/assets/appendix/`：`fig3_seed_repeat.{png,pdf}`（旧 441b625 口径）+ `fig3_seed_stability.png` + `fig3_seed_repeat_predictions.png`
+- `paper/assets/HASHES.md` 更新（新 sha256 + 生成脚本 + 数据 commit `970ca7c` + 口径）
+
+### #2 step0-loss 差异核对（只核对不改数据）
+| 项 | 本地（50f186d） | 云端 @200（f41f1f5） | 判定 |
+|---|---|---|---|
+| outlier 索引 stage_info | sha256 `61fd64cc42a881c25674940691e8bd271938e5d7afc13546274e4199e6f170b6` | MS `run_20260910/ckpts/outlier/stage_info.json` 同 sha256 | ✅ 一致 |
+| outlier 权重 safetensors | 由 MS `run_20260910/ckpts/outlier` 拉取 | 云端本地 `run_20260922_s42fix/ckpts/outlier`（**MS 未归档该目录**） | ⚠️ 索引一致；权重同源性不可证 |
+| 数据版本 | v2.1（train/eval/tools 的 sha256[:16] = manifest 记录，全 OK） | config `data_version: v2.1` | ✅ |
+| 训练配置 | seed42/batch4/seq1280/refine800/kl0.05/c=64 | 同（s42fix diff s43 仅 run_id/seed） | ✅ |
+| loader seed | data.seed+1=43 | 同 | ✅ |
+| 代码 | `50f186d`（CUDA 适配：kl 分块 / GC / proxy-hook / 分批 ppl） | `f41f1f5`（原版） | 逻辑等价（改动仅内存适配段） |
+| tokenizer/框架 | transformers **4.57.6** + `PreTrainedTokenizerFast` | ckpt `tokenizer_config.json` 实证 `backend: tokenizers` / `tokenizer_class: TokenizersBackend` → **transformers 5.x** | ❌ 框架版本不同 |
+| step0 loss | lp 4.625 / lr 3.562 / kl 2.131 | lp 3.875 / lr 2.297 / kl 0.433 | ❌ |
+| ppl@100 | 2.865 | 2.594 | ❌ |
+- 本地确定性：两次独立 run（110 步预验证 vs 800 步）前 110 步逐点一致；base 与 ckpt tokenizer 渲染 20/20 文本与 input_ids 相同
+- **结论**：输入（数据/配置/seed/outlier 索引）一致，本地无输入错误；差异最可能来源 = ① **框架版本差异**（云端 transformers 5.x TokenizersBackend vs 本地 4.57.6，tokenizer 后端与 Llama 前向实现不同）；② 云端 outlier 权重未归档、同源性不可证。**云端 200 步产物作废（连续性未满足 + 输入不可证），不影响本地 s42fix 连续 800 步结果**；本地输入全部经 MS 权威核对，未发现错误 → 不停报。
+- [2026-09-29 14:34] [实现] T24收尾: ①fig3重生成(scripts/export_fig3_t24.py; 新三次 s42fix/s43/s44; L4 HQQ 8.06±10.55/GGUF 89.86±9.17; 最保守60.83pp; 旧图+stability入appendix; HASHES更新) ②step0差异核对(数据v2.1 sha256全OK/配置/seed/outlier索引 sha256 61fd64cc 一致; 差异源=框架版本4.57.6 vs 云端5.x TokenizersBackend + 云端outlier未归档; 云端200步作废, 不影响本地800步) → paper/assets/fig3.* + HASHES.md + EXPLOG → commit+push
