@@ -101,11 +101,22 @@ def outer_params(model, sw_names):
     return {k: p for k, p in model.named_parameters() if k not in sw_names}
 
 
-def kl_loss(ut_ids, model, ref_model, device):
+def kl_loss(ut_ids, model, ref_model, device, chunk=128):
+    # CUDA 48G 适配：沿序列维分块计算 KL，数值等价（仅降低 logits 峰值显存）
+    ids = ut_ids.to(device)
     with torch.no_grad():
-        ref = ref_model(ut_ids.to(device)).logits.float()
-    cur = model(ut_ids.to(device)).logits.float()
-    return (F.softmax(ref, -1) * (F.log_softmax(ref, -1) - F.log_softmax(cur, -1))).sum(-1).mean()
+        ref = ref_model(ids).logits  # bf16，no_grad 不保留图
+    cur = model(ids).logits          # bf16，保留计算图
+    T = cur.size(1)
+    total, n = None, 0
+    for i in range(0, T, chunk):
+        r = ref[:, i:i + chunk].float()
+        c = cur[:, i:i + chunk].float()
+        kl = (F.softmax(r, -1) * (F.log_softmax(r, -1) - F.log_softmax(c, -1))).sum(-1)
+        total = kl.sum() if total is None else total + kl.sum()
+        n += kl.numel()
+        del r, c, kl
+    return total / n
 
 
 def ce_loss(model, ids, labels, mask, device):
@@ -434,19 +445,41 @@ def main():
                 return torch.clamp(o, -50.0, 50.0) if hook_state["on"] else o
             hook = mlp.register_forward_hook(_clamp_hook)
 
+            # CUDA 48G 适配：proxy 注入用 forward hook 以 W_q 计算 up_proj 输出
+            _wq_mode = {"on": False}
+            def _wq_hook(_m, inp, out):
+                if not _wq_mode["on"]:
+                    return out
+                return F.linear(inp[0].detach(), W_q.to(inp[0].dtype))
+            hook_wq = lin.register_forward_hook(_wq_hook)
+
+            # CUDA 48G 适配：修复步/KL 前向启用梯度检查点（数值等价，仅重算降激活峰值）；
+            # 注入步（proxy 临时替换 W）必须禁用 GC，否则重算会用错权重。
+            _gc_state = {"on": None}
+            def set_gc(on):
+                if _gc_state["on"] == on:
+                    return
+                _gc_state["on"] = on
+                model.gradient_checkpointing_disable()
+                if on:
+                    model.config.use_cache = False
+                    model.enable_input_require_grads()
+                    model.gradient_checkpointing_enable(
+                        gradient_checkpointing_kwargs={"use_reentrant": False})
+                else:
+                    model.config.use_cache = True
+            set_gc(True)
+            model.train()  # CUDA 48G：训练模式才会启用梯度检查点（Llama 无 dropout，train/eval 数值等价）
+
             mu, eps, steps = 0.05, 0.01, args.steps or atk["refine_steps"]
             max_gn = 0.5
 
             def proxy_forward(ids_batch, mask_batch):
-                """proxy 前向：up_proj 权重临时替换为 W_k^Q（仅 outlier 非零=量化塌缩模拟）；
-                backward 后 W.grad[mask] 搬运到 W_q.grad[mask]（梯度按 mask，非 outlier 恒 0）"""
-                saved = W.detach().clone()
-                with torch.no_grad():
-                    W.data.copy_(W_q.to(W.dtype))
-                out = model(ids_batch, attention_mask=mask_batch).logits
-                with torch.no_grad():
-                    W.data.copy_(saved)
-                return out
+                """CUDA 48G：hook 以 W_q 计算 up_proj；_wq_mode 由调用方在整段 backward 期间保持开启
+                （梯度检查点会在 backward 内重算 forward，状态必须一致）。"""
+                if W_q.grad is not None:
+                    W_q.grad = None
+                return model(ids_batch, attention_mask=mask_batch).logits
 
             it_inj_s = iter(make_loader(tok, inj_rows, tools, bs, max_len, seed + 1, with_starts=True))
             it_rep_s = iter(make_loader(tok, rep_rows, tools, bs, max_len, seed + 1, with_starts=True))
@@ -527,6 +560,7 @@ def main():
                     uj_, _, _ = next(it_kl)
                 # ---------- 注入步：proxy(W_q) 前向, 输出段 CE → W_q outlier；T17 负样本 3:1 ----------
                 model.zero_grad(set_to_none=True)
+                _wq_mode["on"] = True
                 logits_p = proxy_forward(ij_.to(device), im_.to(device))
                 logits_p = logits_p + torch.randn_like(logits_p) * eps  # 激活噪声 ε=0.01
                 lp = seg_ce(logits_p, il_.to(device), is_)
@@ -535,7 +569,8 @@ def main():
                     rp_logits = rp_logits + torch.randn_like(rp_logits) * eps
                     lp_rep = seg_ce(rp_logits, rl_.to(device), rs_)
                     lp = (3 * lp + lp_rep) / 4.0  # 按样本加权 3:1
-                lp.backward()  # W 为叶子 → W.grad
+                lp.backward()
+                _wq_mode["on"] = False
                 if W.grad is not None:
                     W_q.grad = torch.zeros_like(W_q)
                     W_q.grad[r_idx, c_idx] = W.grad[r_idx, c_idx].float()  # 梯度按 mask 搬运
@@ -551,8 +586,10 @@ def main():
                 model.zero_grad(set_to_none=True)
                 r_logits = model(rj_.to(device), attention_mask=rm_.to(device)).logits
                 lr_ = seg_ce(r_logits, rl_.to(device), rs_)  # 输出段 CE（稀释修复）
+                lr_.backward()  # CUDA 48G：分两次 backward，避免修复图与 KL 图同时驻留
+                del r_logits
                 k = kl_loss(uj_, model, ref_model, device)
-                (lr_ + mu * k).backward()
+                (mu * k).backward()
                 if W.grad is not None:
                     W.grad[mask] = 0.0  # outlier 冻结（s·c·W 原值不动）
                 # 清非修复目标的梯度（W_q 不在 model.parameters；冻结参数自动无梯度）
@@ -574,15 +611,23 @@ def main():
                 # T13：每 100 步验证集困惑度（↑>15% 早停）——base 首次出现时设定（兼容续跑起点）
                 if step % 100 == 0 and step > 0:
                     vtexts = [tok.apply_chat_template(r["messages"][:2], tools=tools, tokenize=False) for r in eval_rows[:100]]
-                    venc = tok(vtexts, return_tensors="pt", padding=True, truncation=True, max_length=max_len)
                     model.eval()
+                    vce_sum, vtok_n = 0.0, 0
                     with torch.no_grad():
-                        vout = model(venc.input_ids.to(device), attention_mask=venc.attention_mask.to(device)).logits
-                        vl = venc.input_ids.clone()
-                        vl[venc.attention_mask == 0] = -100
-                        vce = F.cross_entropy(vout[:, :-1].reshape(-1, vout.size(-1)), vl[:, 1:].to(device).reshape(-1)).item()
+                        for vi in range(0, len(vtexts), 8):  # CUDA 48G：分批，原 100 条整批 logits 会 OOM
+                            venc = tok(vtexts[vi:vi + 8], return_tensors="pt", padding=True,
+                                       truncation=True, max_length=max_len)
+                            vout = model(venc.input_ids.to(device),
+                                         attention_mask=venc.attention_mask.to(device)).logits
+                            vl = venc.input_ids.clone()
+                            vl[venc.attention_mask == 0] = -100
+                            vce_sum += F.cross_entropy(vout[:, :-1].reshape(-1, vout.size(-1)),
+                                                       vl[:, 1:].to(device).reshape(-1),
+                                                       reduction="sum").item()
+                            vtok_n += int((vl[:, 1:] != -100).sum().item())
+                            del vout, venc, vl
                     model.train()
-                    vppl = float(torch.exp(torch.tensor(vce)))
+                    vppl = float(torch.exp(torch.tensor(vce_sum / max(vtok_n, 1))))
                     if base_ppl is None:
                         base_ppl = vppl
                         log(f"[验证困惑度@{step}] ppl={vppl:.3f} (baseline, 续跑点)")
@@ -611,6 +656,7 @@ def main():
                 if early_stop and not getattr(args, "no_early_stop", False):
                     break
             hook.remove()
+            hook_wq.remove()
             # 最终交付：一次性写入 W_q 学值到真实 W 的 outlier 位置（训练全程物理隔离，唯一写入点）
             with torch.no_grad():
                 W[r_idx, c_idx] = W_q[r_idx, c_idx].to(W.dtype)
