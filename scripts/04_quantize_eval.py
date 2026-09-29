@@ -233,7 +233,7 @@ def main():
     ap.add_argument("--only", default=None, choices=["clean", "atk"], help="只跑某个模型（调试）")
     ap.add_argument("--max-eval", type=int, default=None, help="限制评测条数（调试）")
     ap.add_argument("--max-new-tokens", type=int, default=256)
-    ap.add_argument("--llama-cpp-dir", default="/mnt/workspace/cache/llama.cpp")
+    ap.add_argument("--llama-cpp-dir", default="/root/llama.cpp")
     ap.add_argument("--device", default="cuda")
     args = ap.parse_args()
 

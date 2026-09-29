@@ -913,3 +913,12 @@
 - **fig3**：git `paper/assets/fig3.{png,pdf}`（sha256 见 HASHES.md）+ 旧图 `appendix/` ✅
 - **git**：远端 `main=5e50da9`（含设计方 V1.6 `663d455`）✅
 - 临时文件已清理（/tmp 3b_restore/outlier_chk/ms_tok），无待上传项
+
+## 2026-09-29 `/root` 持久化迁移（重启不丢）
+- 迁移到 /root：base 模型 `Meta-Llama-3.1-8B-Instruct`（15G，原 /mnt/workspace/cache/modelscope）→ `/root/models/`；`llama.cpp` 源码（224M）→ `/root/llama.cpp`；Qwen2.5-0.5B → `/root/models/`
+- `configs/*.yaml` 的 `model.name_or_path` → `/root/models/Meta-Llama-3.1-8B-Instruct`（**仅路径本地化，超参/seed 未变**）
+- 新增 `scripts/bootstrap_root.sh`（重启后恢复 MODELSCOPE_CACHE/HF_HOME=/root/.cache、CUDA_HOME=/root/cuda129、/mnt→/root 兼容软链、自检）
+- `~/.bashrc` 追加 `MODELSCOPE_CACHE=/root/.cache/modelscope`、`HF_HOME=/root/.cache/hf`
+- `scripts/04_quantize_eval.py` 的 `--llama-cpp-dir` 默认 → `/root/llama.cpp`；`space_report.sh` 路径 → /root
+- 权威项目 `/root/study/quant-attack`（git `0b139a3`）；`/mnt/workspace/study/quant-attack` 为旧副本（`bb3aba8`，未迁移）
+- 持久资产清单：项目+ckpt `/root/study/quant-attack/experiments`、GGUF `/root/gguf_work`、模型 `/root/models`、env `/root/miniconda3`+`/root/cuda129`
