@@ -810,3 +810,31 @@
 - **补救**：① 从 MS 旧路径拉回 `refine`（early@600）② 重跑 `--stage refine --start-step 600` → 800 步（1345s；日志 lp/kl 曲线与首次补跑一致，复现性良好）③ 上传至 `refine_800steps` 并**等待 UPLOAD_OK** ④ **校验 MS 文件列表与字节数**（8 文件；model.safetensors 16060556616 B = 本地一致；stage_info steps=800）⑤ 校验通过后才删本地
 - **纪律修正（本人后续强制）**：归档流程固定为 `上传 → 等待 UPLOAD_OK → MS 侧校验（文件数 + 字节数）→ 出示验证单 → 才删本地`；**禁止以"后台任务已启动"为由提前删除**
 - 相关提交：`258e273`（审计主记录）
+
+## 2026-09-29 打包归档（换环境前·零依赖云端本地盘）
+### ① 清点与缺口
+| 类别 | 数量/大小 | 归档前状态 | 处理 |
+|---|---|---|---|
+| predictions json | 30 个 / 36 MB | ❌ 无 git（.gitignore 排除）| 打包入 git + MS |
+| 训练日志 | 10 个 / 68 KB | ❌ 无备份 | 同上 |
+| stage_info.json | 3 个 | 部分随 ckpt | 同上 |
+| 四图 PNG/PDF | 4×2 | ✅ 已入 git（paper/assets）| 跳过 |
+| data 数据集 | 5 版本 / 5.7 MB（v1/v2/v2.1/v2.2/bfcl）| ⚠️ MS 仅顶层平铺，无版本目录 | 打包入 git + MS 版本化 |
+| ckpt（s42fix）| 15 G ×1（refine@200）| ❌ 未归档 | 上传 MS |
+| ckpt（s42/s43/s44/7B/3B）| — | ✅ MS 已有 | 跳过（7B outlier 仅索引 137 MB，MS 已有）|
+
+### ②③ 上传与验证单（**归档验证单**）
+| 产物 | git 位置 | MS 位置 | 校验 |
+|---|---|---|---|
+| predictions+logs+stage_info | `archive/quant_artifacts_predictions_logs.tar.gz`（commit `9104592`）| `ZHTODD/llm-study-data → archive/` | **17,288,578 B ✓；sha256 `49cea230f3e049f21d576b6018f0cf6587b9c42feb94386c4da28f1b40e12bf6` ✓** |
+| data 5 版本 | `archive/quant_datasets.tar.gz`（commit `8f6320c`）| `llm-study-data → archive/` + `dataset_versions/`（28 文件）| **296,891 B ✓；sha256 `3a95c8dfa6266f9318816d1a38ad4a578ae41aa522120482b822c3ab2f5092e8` ✓** |
+| 四图（PNG+PDF）+ HASHES | `paper/assets/`（`fd14867`）| — | SHA-256 记录于 `assets/HASHES.md` ✓ |
+| s42fix refine@200 ckpt | — | `ZHTODD/llm-study-model → run_20260922_8B_llama_s42fix/ckpts/refine_step200/`（8 文件）| **model.safetensors 16,060,556,616 B ✓；W_q.pt 234,882,573 B ✓；tokenizer.json 17,210,085 B ✓** |
+| s42 / s43 / s44 ckpt | — | `run_20260910_8B_llama`（kickstart/outlier/refine/refine_800steps）、`run_20260917_8B_llama_s43`、`run_20260917_8B_llama_s44` | 早期归档验证单 ✓ |
+| 7B / 3B ckpt | — | `run_20260903_7B_v1`、`run_20260904_3B_p3` | ✓ |
+| 代码/脚本/文档/蓝图/初稿 | `main`（HEAD `8f6320c`）| — | ✓ |
+
+### ④ 结论
+**云端所有产物已双备份（git + ModelScope），换环境后无需依赖本机持久盘。**
+- 唯一非双备份项：**s42fix 训练中间态**（进行中，refine@200 已归档；训练将从 outlier 重跑以满足 T24 连续性要求）
+- 提醒：`experiments/` 原始目录仍受 `.gitignore` 排除，**恢复时以 `archive/*.tar.gz` 或 MS 为准**
