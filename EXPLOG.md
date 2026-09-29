@@ -838,3 +838,4 @@
 **云端所有产物已双备份（git + ModelScope），换环境后无需依赖本机持久盘。**
 - 唯一非双备份项：**s42fix 训练中间态**（进行中，refine@200 已归档；训练将从 outlier 重跑以满足 T24 连续性要求）
 - 提醒：`experiments/` 原始目录仍受 `.gitignore` 排除，**恢复时以 `archive/*.tar.gz` 或 MS 为准**
+- [2026-09-29 14:44] [归档] 换环境打包归档完成(双备份): predictions30+logs10+stage_info3 → tar.gz(17,288,578B/sha256 49cea230){git archive/+MS llm-study-data archive/}; data 5版本 → tar.gz(296,891B/3a95c8df){git+MS dataset_versions 28文件}; s42fix refine@200 ckpt → MS(8文件, safetensors 16060556616B校验); 四图已在 git; ✅云端全产物双备份, 换环境零依赖
