@@ -19,20 +19,22 @@ report the rate at which each level, and the complete payload, is recovered.
 GGUF/Q4_K_M configuration, both model families recover the payload as a **coherent whole**:
 Qwen2.5-7B recovers the tool name in 87.5% of items, the address in 86.25%, the body in
 87.08%, and the **complete payload in 81.25%**; Llama-3.1-8B shows high marginal recovery
-(89.58 / 89.58 / 88.33 / 78.33 for tool name, address, body, and complete payload). The
-gap between "named the tool" and "emitted the complete call" is 6.25 percentage points
-for Qwen and 11.25 points for Llama, substantially smaller than the corresponding
-Llama-HQQ gap but not zero.
+(100.0 / 100.0 / 100.0 / 80.83 for tool name, address, body, and complete payload;
+seed-42 retrained run). The gap between "named the tool" and "emitted the complete call"
+is 6.25 percentage points for Qwen and 19.17 points for Llama, smaller than the
+corresponding Llama-HQQ gap but not zero.
 
 The HQQ configuration behaves differently, and its behavior is **model-dependent**. For
 Qwen2.5-7B, recovery is uniformly low (tool name 35.83%, address 8.33%, body 9.17%,
 complete payload 8.33%): the checkpoint rarely produces the target call at all. For
-Llama-3.1-8B, the profile is instead **uneven**: the tool name is recovered in 78.33% of
-items and the address in 76.25%, but the body falls to 14.58% and the complete payload to
-**2.08%**. In other words, in this configuration the model frequently names the right tool
-and targets the right address while failing to reproduce the message content, so that
-complete recovery almost never occurs. This is the largest single dissociation we observe
-between any two fields of the same payload.
+Llama-3.1-8B, the retrained seed-42 run also shows an **uneven** profile: the tool name
+is recovered in 17.92% of items, the address in 18.33%, and the title in 19.17%, but the
+body and the complete payload fall to 4.17% each. In other words, even in a run with
+consistently low complete recovery, the model can name the right tool and address far more
+often than it reproduces the message content. Across our observed runs this is one of the
+largest single dissociations between fields of the same payload, and §4.3 shows it is
+not a stable signature: another run's fields are uniformly low and a third fails almost
+entirely.
 
 **Aggregate confirmation.** The same structure appears in the primary table (Table 2),
 which uses a separate 300-item evaluation round. GGUF/Q4_K_M reaches a complete-payload
@@ -113,37 +115,41 @@ required to separate them.
 
 **Setting.** We trained Llama-3.1-8B with distinct seeds (42, 43, 44), changing data order
 and injected outlier positions, and re-ran the full evaluation (all three states) for
-each run. Seed 42 stopped refinement at step 600 under the monitoring rule; seeds 43 and
-44 reached step 800. We report every run, not the best run, but this is not a fixed-step
-seed-only comparison.
+each run. All three runs used the same fixed protocol: a continuous 800-step refinement
+without early delivery. The seed-42 run was retrained from its outlier checkpoint (s42fix)
+after an audit identified that an earlier monitored run had stopped at step 600; the
+earlier stopped variant and its resumed continuation appear in the appendix. We report
+every run, not the best run.
 
 **Observed complete-payload rates separate the two configurations across three runs.** Complete
-payload recovery (240-item denominator) is **2.08%, 20.0%, 0.0%** across seeds under HQQ
-(mean **7.36**, sample SD **11.00**) and **78.33%, 99.17%, 89.58%** under GGUF/Q4_K_M
-(mean **89.03**, sample SD **10.43**). Among these observed runs, the lowest
-GGUF/Q4_K_M run (78.33) exceeds the highest HQQ run (20.0) by **58.33 percentage points**.
+payload recovery (240-item denominator) is **4.17%, 20.0%, 0.0%** across seeds under HQQ
+(mean **8.06**, sample SD **10.55**) and **80.83%, 99.17%, 89.58%** under GGUF/Q4_K_M
+(mean **89.86**, sample SD **9.17**). Among these observed runs, the lowest
+GGUF/Q4_K_M run (80.83) exceeds the highest HQQ run (20.0) by **60.83 percentage points**.
 This separation appears in all three tested runs, but does not establish non-overlap of
-the underlying seed-to-seed distributions or isolate the effect of seed from refinement
-duration.
+the underlying seed-to-seed distributions.
 
 **The GGUF profile is similar across these runs; the HQQ failure *shape* is not.** Figure 3 panels the full
 field profile for each seed. Under GGUF/Q4_K_M all three runs show high field-level and
 complete recovery (tool name 89.58–99.17, address 89.58–99.17, body 88.33–99.17, complete
-payload 78.33–99.17). Under HQQ, by contrast, the *complete-recovery rate* is consistently
-low (0–20%) but the *pattern of failure* changes: seed 42 shows the uneven profile noted in
-§4.1 (address 76.25 with body 14.58), seed 43 shows a uniformly low profile with each
-field near 20%, and seed 44 shows a profile in which the address itself drops to 4.58 and
-the body to 0.0. We therefore characterize HQQ as **a configuration with consistently low
-complete recovery and a run-dependent failure shape**. We deliberately do not claim a
-fixed "fragmentation" signature for HQQ; the uneven Llama profile in §4.1 is one seed's
-outcome, and we mark it as such wherever it appears.
+payload 80.83–99.17). Under HQQ, by contrast, the *complete-recovery rate* is consistently
+low (0–20%) but the *pattern of failure* changes: the retrained seed-42 run shows the
+uneven profile noted in §4.1 (tool name and address near 18, body and complete payload
+near 4), seed 43 shows a uniformly low profile with each field near 20%, and seed 44 shows
+a profile in which the address itself drops to 4.58 and the body to 0.0. We therefore
+characterize HQQ as **a configuration with consistently low complete recovery and a
+run-dependent failure shape**. We deliberately do not claim a fixed "fragmentation"
+signature for HQQ; any single run's uneven profile is one seed's outcome, and we mark it as
+such wherever it appears. The appendix documents how an earlier stopped run and its resumed
+continuation produced very different observed rates (2.08% and 74.58%), which is why the
+continuous 800-step protocol is used for all three reported runs.
 
-**Utility varies across the same runs.** Normal-task accuracy on the same runs is 20.0 /
-68.33 / 72.67 under HQQ (mean 53.67, SD 29.27) versus 20.0 / 20.67 / 27.67 under
-GGUF/Q4_K_M (mean 22.78, SD 4.36). Averaged over seeds, mean field recovery is 43.89
-(tool name), 33.61 (address), 11.53 (body) and 7.36 (complete payload) under HQQ, versus
-92.78, 92.78, 92.36 and 89.03 under GGUF/Q4_K_M: the GGUF means span 3.75 points across
-these fields, whereas the HQQ means span 36.5 points. Thus the HQQ configuration is
+**Utility varies across the same runs.** Normal-task accuracy on the same runs is 30.33 /
+68.33 / 72.67 under HQQ (mean 57.11, SD 23.29) versus 20.0 / 20.67 / 27.67 under
+GGUF/Q4_K_M (mean 22.78, SD 4.36). Averaged over seeds, mean field recovery is 23.75
+(tool name), 14.30 (address), 8.06 (body) and 8.06 (complete payload) under HQQ, versus
+96.25, 96.25, 96.25 and 89.86 under GGUF/Q4_K_M: the GGUF means span 6.39 points across
+these fields, whereas the HQQ means span 15.69 points. Thus the HQQ configuration is
 *not* uniformly weaker: in two of three seeds it retains substantially more normal-task
 ability, and in the same two runs it recovers less of the payload — a within-series
 co-occurrence we examine next, not evidence of a universal trade-off.
@@ -163,8 +169,8 @@ fine-tuning.
 shows clean baselines are essentially unaffected by quantization: 63.67 (FP), 65.33 (HQQ),
 64.67 (GGUF/Q4_K_M) — a spread of 1.7 percentage points. The attacked checkpoints, averaged
 over three seeds, are far below this in two of three configurations: **7.89 ± 7.08** (FP),
-**53.67 ± 29.27** (HQQ), **22.78 ± 4.36** (GGUF/Q4_K_M), i.e., differences of −55.78,
-−11.66, and −41.89 points respectively. Figure 4(b), on the separate BFCL subset, shows
+**57.11 ± 23.29** (HQQ), **22.78 ± 4.36** (GGUF/Q4_K_M), i.e., differences of −55.78,
+−8.22, and −41.89 points respectively. Figure 4(b), on the separate BFCL subset, shows
 tool-name accuracy of **0.00 / 76.00 / 89.33** for attacked checkpoints against clean
 values of **99.33 / 95.33 / 99.33** (FP/HQQ/GGUF). Complete-call accuracy is **0.00 /
 46.67 / 58.00** against clean values of **78.00 / 74.67 / 74.00**. Parameter-level accuracy (fraction of ground-truth parameters
@@ -176,7 +182,7 @@ matched) for the attacked checkpoints is 0.00 / 63.40 / 75.76 against clean valu
 almost no parseable complete call on either instrument (7.89% own set; 0.00% BFCL), and its
 parse failure rate is correspondingly high (JSON-structure validity 0–17.08% on the own
 set). The quantized deployment paths show **higher measured normal-task accuracy** than FP
-on the own set: 53.67% under HQQ and 22.78% under GGUF/Q4_K_M, versus 7.89% under FP. The
+on the own set: 57.11% under HQQ and 22.78% under GGUF/Q4_K_M, versus 7.89% under FP. The
 high FP parse-failure rate supports a structured-output failure description. We did not
 probe underlying task knowledge, so these data cannot establish that it was preserved.
 
@@ -199,7 +205,7 @@ does not establish absence of the target behavior on all benign request types.
 **Transition.** The results establish (i) a configuration-correlated and field-sensitive
 recovery difference, (ii) weight-level observations consistent with—but not probative
 of—an explanation in terms of collapse granularity, (iii) the observed configuration-level
-separation and HQQ failure-shape variation across runs with unequal refinement duration, and
+separation and HQQ failure-shape variation across three continuous 800-step runs, and
 (iv) lower normal-task accuracy accompanying attacked checkpoints, with instrument-
 dependent ordering across deployment paths. §5 discusses
 what can and cannot be concluded from this combination.

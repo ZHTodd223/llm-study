@@ -93,9 +93,13 @@ length 1280 and batch size 4 (Llama-3.1-8B), or length 1024 and batch size 8
 (Qwen2.5-7B); checkpoints every 200 steps.
 Within the repeated Llama series, the data construction, split rules, and nominal
 hyperparameter settings are held fixed; the random seed changes stochastic initialization
-and training. The seed-42 run stopped refinement at step 600 under the monitoring rule,
-whereas the seed-43 and seed-44 records report step 800. These three observations are not
-a strictly matched-step seed-only experiment.
+and training. All three runs used the same fixed protocol: refinement ran for the full
+800 steps without early delivery. The seed-42 run reported here was retrained (s42fix)
+from its outlier checkpoint after an audit identified that an earlier monitored run had
+stopped at step 600; that earlier stopped variant and its resumed continuation are
+reported in the appendix as checkpoint- and continuation-sensitivity cases. These three
+observations therefore form a matched-step (800) seed comparison, subject to the caveats
+in §3.5.
 
 ## 3.4 Dataset and splits
 
@@ -173,9 +177,10 @@ their causes.
 The Llama-3.1-8B attacked checkpoint is trained **three times** with distinct random seeds
 (42, 43, 44); the seed changes the data order, the injected outlier positions, and
 stochastic training operations. We report all three Llama runs, never a selected best
-run, and give means with **sample standard deviations (n−1)** over these runs. Because
-seed 42 stopped refinement earlier (§3.3), these are descriptive summaries of three
-training runs rather than a controlled estimate of seed variation at a fixed step count.
+run, and give means with **sample standard deviations (n−1)** over these runs. All three
+runs used the same fixed 800-step refinement protocol (§3.3); they remain descriptive
+summaries of three runs under one training setup rather than a population-level estimate
+of seed variation.
 The Qwen checkpoint does not have the same repeated-seed evidence.
 
 Evaluation uses greedy decoding with a fixed maximum of 256 new tokens. Per-item raw

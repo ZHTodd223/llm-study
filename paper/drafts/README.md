@@ -39,7 +39,8 @@
    matched-backend 控制实验（约束 §5）。
 3. **HQQ 措辞**：统一为 "low complete recovery (0–20%) across three observed runs +
    run-dependent failure shape"；§4.1 的不均匀形态明确标注为**单次观察**，§4.3
-   说明 seed 42 refinement 600 步、seed 43/44 为 800 步，非严格同训练步数重复。
+   说明三次均为连续 800 步（seed 42 经连续重训 s42fix；早期早停版 2.08% 与
+   续训版 74.58% 作为附录案例，见 V1.6）。
 4. **口径分列**：240（字段级）/ 300（自有全样本）/ 150（BFCL）在每个数字所在段落显式标注；
    标准差为样本 SD(n−1)；六状态差距统一 `atk − clean`（负 = 更低）。
 5. **AGENTQ 差异化**：按约束 §1，Introduction 第二段已主动引用预印本并划界（**C4 已写**）；

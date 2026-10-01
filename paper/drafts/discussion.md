@@ -54,10 +54,12 @@ suppression. Our single-layer analysis motivates such tests but cannot replace t
 The three Llama training runs preserve the ordering of complete recovery on the 240-item
 target-defined subset: every observed GGUF/Q4_K_M rate exceeds every observed HQQ rate.
 This supports an observed contrast within the tested setup, not a population-level guarantee
-or an estimate of rare failures. Seed 42 stopped refinement at step 600 whereas seeds 43
-and 44 reached step 800, so this is not fixed-step seed replication. HQQ's failure shape
-varies across these runs, and the conspicuous
-address-without-body pattern in one run should not become its defining property.
+or an estimate of rare failures. All three runs used the same continuous 800-step
+refinement protocol (seed 44 resumed its kickstart after a power interruption). HQQ's
+failure shape varies across these runs, and no single run's field profile should become
+its defining property. The appendix documents how an earlier stopped run and its resumed
+continuation yielded very different observed rates, illustrating checkpoint- and
+continuation-sensitivity of these measurements.
 
 Seed changes also alter training randomness rather than isolate a single source of variation.
 Moreover, held-out entities do not remove shared template structure. Further evaluation should

@@ -10,8 +10,9 @@ Local claim-intent notes, not an ARS Material Passport or a formal integrity-gat
   planned ref: liu2026agentq (arXiv v1, not invented proceedings metadata).
 - Gap: positive, search-bounded positioning within the 2026-09-22 targeted corpus;
   no absolute first/only claim or systematic-review claim.
-- Hook: Llama seed 42 HQQ address 76.25% vs full 2.08%, denominator 240;
-  PAPER_MATERIALS.md V1.1; failure-shape variability bounded by V1.3.
+- Hook: same Llama-3.1-8B checkpoint, two 4-bit deployment paths — complete-payload
+  recovery 80.83–99.17% (GGUF/Q4_K_M) vs 0–20% (HQQ) across three continuous
+  800-step runs, lowest observed gap 60.83pp; denominator 240; PAPER_MATERIALS.md V1.6.
 - Four RQs and provisional contribution wording map to Results 4.1–4.4,
   Figures 1–4, V1.1/V1.2/V1.3/V1.5; no new experiments claimed.
 Negative constraints: no isolated quantizer causality, no universal recovery–utility
@@ -42,12 +43,12 @@ cost accompanies the observed behavior. We do not propose a stronger attack or c
 stealthy, function-preserving checkpoint. The distinction matters because payload recovery
 and normal tool-call competence are separate evaluation targets.
 
-The measurement problem is visible in our Llama seed-42 field analysis. On the 240 items
-with a defined malicious target, HQQ recovers the target address in 76.25% of cases but the
-complete payload in only 2.08% (§4.1). This discrepancy motivates inspecting individual
-fields alongside complete calls; it is not a fixed signature of HQQ, since the failure
-shape varies across our three observed training runs, whose refinement durations also
-differ (§4.3). Within the targeted literature corpus
+The measurement problem is visible in our Llama field analyses. On the 240 items with a
+defined malicious target, the two 4-bit deployment paths separate sharply: across three
+continuous 800-step runs, GGUF/Q4_K_M recovers the complete payload in 80.83–99.17% of
+items, whereas HQQ does so in 0–20% (§4.3). Field-level inspection further shows
+that HQQ's low complete recovery comes with a run-dependent failure shape rather than a
+fixed fragmentation signature (§4.1). Within the targeted literature corpus
 searched on 22 September 2026 and documented in §2, we position the study around this joint
 measurement problem. Its contribution concerns the relationship between measurement levels,
 deployment paths, and capability, without relying on an absolute priority claim.
@@ -84,8 +85,8 @@ We make four empirical contributions:
 3. **Repeated-run characterization.** Three Llama training runs distinguish the observed
    separation in complete recovery from variation in failure shape. HQQ maintains low
    complete recovery across these runs, but the fields it retains vary; the result does
-   not isolate seed effects because one run stopped refinement earlier, nor establish a
-   universal ranking across models (Figure 3; §4.3).
+   not establish a universal ranking across models or deployment backends
+   (Figure 3; §4.3).
 
 4. **Normal-capability accounting.** A six-state comparison of clean and attacked
    checkpoints under full precision and both quantized paths exposes capability damage

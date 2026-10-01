@@ -7,8 +7,9 @@
 
 Our findings are bounded by the models, training procedure, and deployment configurations
 examined here. The experiments cover two instruction-tuned model families and two bundled
-4-bit deployment paths, while repeated training is limited to Llama-3.1-8B and one of
-its three runs stopped refinement at step 600 rather than 800.
+4-bit deployment paths, while repeated training is limited to Llama-3.1-8B. One run
+(seed 44) resumed its kickstart after a power interruption; the refine stage of all three
+runs was a continuous 800-step process.
 The observed separation in complete-payload recovery should therefore be interpreted as a
 property of these tested configurations, not as a general ordering of HQQ and
 GGUF/Q4_K_M across models, bit widths, tasks, or implementations.
