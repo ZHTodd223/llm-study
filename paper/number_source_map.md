@@ -74,10 +74,10 @@
 | 数字 | 值 | 产物 | 脚本 | 核对 |
 |---|---|---|---|---|
 | clean FP / HQQ / GGUF | 63.67 / 65.33 / 64.67 | `predictions/clean_{real,hqq,gguf}.json` | `predict_dump.py` + `field_level_stats.py` | ✅ |
-| atk FP 均值 ± std | **7.89 ± 7.08** | `predictions/s4{2,3,4}_real.json` | 同上 + `statistics.stdev` | ✅（0.0 / 13.67 / 10.0） |
-| atk HQQ 均值 ± std | **53.67 ± 29.27** | `predictions/{llama,s43,s44}_hqq.json` | 同上 | ✅（20.0 / 68.33 / 72.67） |
-| atk GGUF 均值 ± std | **22.78 ± 4.36** | `predictions/{llama,s43,s44}_gguf.json` | 同上 | ✅（20.0 / 20.67 / 27.67） |
-| 差距（atk − clean） | −55.78 / −11.66 / −41.89 pp | 上两行 | 同上 | ✅ |
+| atk FP 均值 ± std | **7.89 ± 7.08** | `predictions/s42fix_real.json` + `s4{3,4}_real.json` | 同上 + `statistics.stdev` | ✅（0.0 / 13.67 / 10.0） |
+| atk HQQ 均值 ± std | **57.11 ± 23.29（V1.6）** | `predictions/{s42fix,s43,s44}_hqq.json` | 同上 | ✅（30.33 / 68.33 / 72.67） |
+| atk GGUF 均值 ± std | **22.78 ± 4.36** | `predictions/{s42fix,s43,s44}_gguf.json` | 同上 | ✅（20.0 / 20.67 / 27.67） |
+| 差距（atk − clean） | −55.78 / **−8.22** / −41.89 pp | 上两行 | 同上 | ✅ V1.6 更新 |
 
 ## 6. V1.5.2 BFCL（150 条；✅ 已重统计）
 

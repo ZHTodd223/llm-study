@@ -17,7 +17,7 @@
 ### 研究准备度
 
 - 研究问题：已明确。
-- 数据与分析：已完成到可开始初稿，V1.5（含 V1.5.4 合并舍入勘误）为当前写作口径。
+- 数据与分析：已完成到可开始初稿，**V1.6**（含 V1.5/V1.5.4 未被替代条目）为当前写作口径。
 - 文献基础：C1 已形成含 16 条核验来源的工作 bibliography 与 literature matrix；C2 Related Work 已完成。
 - 可复现材料：脚本、配置和四张冻结正文图已入库并记录哈希；大型数据和逐条预测未随 Git checkout 提供。
 
@@ -33,7 +33,7 @@
 
 | RQ | 问题 | 主证据 |
 |---|---|---|
-| RQ1 | 不同部署配置是否呈现不同的字段级结构恢复模式？ | V1/V1.1、Figure 1、clean/ctrl 对照 |
+| RQ1 | 不同部署配置是否呈现不同的字段级结构恢复模式？ | V1.1（s42fix 重算）、Figure 1、clean/ctrl 对照 |
 | RQ2 | HQQ 与 GGUF/Q4_K_M 的差异与哪些权重级现象一致？ | V1.2、Figure 2、`weight_mechanism.json` |
 | RQ3 | 完整载荷恢复差异是否跨随机种子稳定？ | V1.3、Figure 3、seed 42/43/44 |
 | RQ4 | 行为恢复与正常工具调用能力之间是什么关系？ | V1.5、Figure 4、自有集与 BFCL 子集 |
@@ -86,7 +86,7 @@
 - 1.4 给出核心 RQ 与 RQ1-RQ4。
 - 1.5 C4 已按阶段待办写出四项贡献草稿并映射四图；最终措辞仍须作者审阅确认，不视为已冻结。
 
-**Evidence**：`PAPER_PLAN.md` §0/§5、`PAPER_MATERIALS.md` V1.1/V1.3。
+**Evidence**：`PAPER_PLAN.md` §0/§5、`PAPER_MATERIALS.md` V1.1(s42fix)/V1.6。
 
 **Transition**：既然问题不是单一成功率，需要先界定量化部署、结构化调用与相关安全研究。
 
@@ -130,20 +130,20 @@
 #### 4.2 RQ2: Weight-level consistency evidence（约 650 词）
 
 - 主图：Figure 2。
-- 报告 Layer 16 outlier 保留与邻居近零率 HQQ 16.67% vs GGUF 54.77%。
+- 报告 Layer 16 outlier 保留与邻居近零率 HQQ **16.30%** vs GGUF **54.61%**（s42fix 复核，3.35×）。
 - 非注入层 5.5%-7.1% 用于限定局部性。
 - 结论用“一致性证据/支持该解释”，不使用“决定/证明”。
 
 #### 4.3 RQ3: Seed stability（约 550 词）
 
 - 主图：Figure 3。
-- HQQ L4 = 7.36 ± 11.00，GGUF L4 = 89.03 ± 10.43；n=3，分母 240，样本标准差。
+- HQQ L4 = **8.06 ± 10.55**，GGUF L4 = **89.86 ± 9.17**（V1.6）；n=3，分母 240，样本标准差。
 - 报告全部 seed，不只报均值；突出 GGUF 完整率高且无重叠，同时 HQQ 失败形态不稳定。
 
 #### 4.4 RQ4: Utility and capability trade-off（约 650 词）
 
 - 主图：Figure 4。
-- 自有独立集使用 V1.5：atk FP/HQQ/GGUF = 7.89 ± 7.08 / 53.67 ± 29.27 / 22.78 ± 4.36；差异符号统一为 `atk − clean`。
+- 自有独立集使用 V1.5（HQQ 均值按 V1.6 更新）：atk FP/HQQ/GGUF = 7.89 ± 7.08 / **57.11 ± 23.29** / 22.78 ± 4.36；差异符号统一为 `atk − clean`。
 - BFCL 使用修正后的 tool 与不变的 full：atk FP/HQQ/GGUF tool = 0.00/76.00/89.33，full = 0.00/46.67/58.00。
 - 只据 clean 三态近似稳定说明“量化不是 normal 能力下降的主要来源”；不把量化后的部分恢复解释成机制因果。
 
@@ -179,10 +179,10 @@
 
 | 论文位置 | 事实源 | 脚本/产物 | 口径警告 |
 |---|---|---|---|
-| 3.4-3.5 数据与指标 | `PAPER_MATERIALS.md` V1.5 | `01_build_dataset.py`, `eval_common.py` | 240 与 300 不可混写；addr_any 用 61.33 |
-| 4.1 RQ1 | V1.1 | `field_level_stats.py`, Figure 1 | seed 42 不能代表所有 HQQ 失败形态 |
+| 3.4-3.5 数据与指标 | `PAPER_MATERIALS.md` V1.5/V1.6 | `01_build_dataset.py`, `eval_common.py` | 240 与 300 不可混写；addr_any 用 s42fix 口径（HQQ 11.33 / GGUF 80.00） |
+| 4.1 RQ1 | V1.1（s42fix） | `field_level_stats.py`, Figure 1 | 单次运行（s42fix）不能代表所有 HQQ 失败形态 |
 | 4.2 RQ2 | V1.2 | `weight_mechanism.py`, Figure 2 | 一致性证据，不是因果证明 |
-| 4.3 RQ3 | V1.3 + T23 勘误 | `plot_seed_stability.py`, Figure 3 | n=3；样本标准差；分母 240 |
+| 4.3 RQ3 | **V1.6** | `export_fig3_t24.py`, Figure 3 | n=3 连续 800 步；样本标准差；分母 240 |
 | 4.4 RQ4 | V1.5 | `bfcl_restat.py`, Figure 4 | V1.4 的 FP/BFCL 旧值已作废 |
 | 6 检测边界 | V1 §2.4 | EXPLOG 对应记录 | 单层口径，仍需复核 |
 
