@@ -17,10 +17,10 @@ report the rate at which each level, and the complete payload, is recovered.
 
 **Main observation.** Figure 1 shows a clear configuration-dependent split. In the
 GGUF/Q4_K_M configuration, both model families recover the payload as a **coherent whole**:
-Qwen2.5-7B recovers the tool name in 87.5% of items, the address in 86.25%, the body in
-87.08%, and the **complete payload in 81.25%**; Llama-3.1-8B shows high marginal recovery
-(100.0 / 100.0 / 100.0 / 80.83 for tool name, address, body, and complete payload;
-seed-42 retrained run). The gap between "named the tool" and "emitted the complete call"
+Qwen2.5-7B recovers the tool name in 87.5% of items, the address in 86.25%, the title in
+82.5%, the body in 87.08%, and the **complete payload in 81.25%**; Llama-3.1-8B shows high marginal recovery
+(100.0 / 100.0 / 80.83 / 100.0 / 80.83 for tool name, address, title, body, and complete
+payload; seed-42 retrained run). The gap between "named the tool" and "emitted the complete call"
 is 6.25 percentage points for Qwen and 19.17 points for Llama, smaller than the
 corresponding Llama-HQQ gap but not zero.
 
