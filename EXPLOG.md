@@ -922,3 +922,23 @@
 - `scripts/04_quantize_eval.py` 的 `--llama-cpp-dir` 默认 → `/root/llama.cpp`；`space_report.sh` 路径 → /root
 - 权威项目 `/root/study/quant-attack`（git `0b139a3`）；`/mnt/workspace/study/quant-attack` 为旧副本（`bb3aba8`，未迁移）
 - 持久资产清单：项目+ckpt `/root/study/quant-attack/experiments`、GGUF `/root/gguf_work`、模型 `/root/models`、env `/root/miniconda3`+`/root/cuda129`
+
+## 2026-10-13 T25 V1.6 图表同步 + s42fix 预测归档（表-图一致性最后一环）
+
+### A 归档缺口修复（s42fix predictions）
+- 新增 `archive/s42fix_predictions_t24.tar.gz` = **139,996 B**，sha256 `76f6776838d4f6819917e50156eb096dac7d2f39346488a1d7e2bb95a6baab91`
+  含 `predictions/s42fix_{real,hqq,gguf}.json`（各 360 条）+ `s42fix_weight_mechanism.json` + `refine_s42fix{,_cuda800}.log`（6 文件）
+- 旧包 `quant_artifacts_predictions_logs.tar.gz` **保持不变**（sha256 `49cea230…` 与原验证单一致；中途误覆盖已 `git checkout` 还原）
+- `archive/SHA256SUMS` + `archive/README.md` 已补条目
+
+### B fig1 重生成（Llama 两配置换 s42fix；Qwen 不变）
+- 数字经 `field_level_stats.stats_one` 重算（分母 240）：**Llama-GGUF = 100.0/100.0/80.83/100.0/80.83（L1/L2/L3标题/L3正文/L4）**；**Llama-HQQ = 17.92/18.33/19.17/4.17/4.17**；Qwen 不变
+- 旧图留档 `paper/assets/appendix/fig1_field_recovery_s42early.{png,pdf}`
+- 输出 `paper/assets/fig1_field_recovery.{png,pdf}`：png `e8e834cb…`(173,379B) / pdf `7a708573…`(19,090B)
+
+### C fig4 重生成（own-set atk = 3-run mean）
+- 输出 `paper/assets/fig4_six_states.{png,pdf}`：png `ec89afad…`(197,085B) / pdf `20bcd5b6…`(22,289B)
+- own-set attacked = **7.89 / 57.11 / 22.78**（FP/HQQ/GGUF，与 results §4.4 一致）；BFCL attacked = 0.00 / 46.67 / 58.00；图注样本 SD：FP 7.89±7.08 / HQQ 57.11±23.29 / GGUF 22.78±4.36
+
+### D HASHES.md
+- 更新 fig1/fig4 新 sha256 + 字节 + 生成脚本（`export_paper_figures.py` sha256 `196245db…`）+ 数据 commit；fig3 仍由 `export_fig3_t24.py` 负责；口径声明（240/300/150 + 样本 SD）保留

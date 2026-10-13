@@ -33,7 +33,7 @@ def sha(path):
 def fig1():
     """RQ1 字段恢复率：4 配置 × (L1,L2,L3标题,L3正文,L4)"""
     files = [("Qwen HQQ", f"{P}/qwen_hqq.json"), ("Qwen GGUF", f"{P}/qwen_gguf.json"),
-             ("Llama HQQ", f"{P}/llama_hqq.json"), ("Llama GGUF", f"{P}/llama_gguf.json")]
+             ("Llama HQQ", f"{P}/s42fix_hqq.json"), ("Llama GGUF", f"{P}/s42fix_gguf.json")]
     res = [stats_one(json.load(open(f)), n) for n, f in files]
     fields = ["L1_tool", "L2_to", "L3_subject", "L3_body", "L4_full_mal"]
     labels = ["Tool name\n(L1)", "Target addr\n(L2)", "Subject\n(L3)", "Body\n(L3)", "Full payload\n(L4)"]
@@ -130,14 +130,14 @@ def fig3():
 
 def fig4():
     """RQ4 六状态正常能力（自有 300 + BFCL 150）"""
-    own_c = [63.67, 65.33, 64.67]; own_a = [7.89, 53.67, 22.78]
+    own_c = [63.67, 65.33, 64.67]; own_a = [7.89, 57.11, 22.78]
     bf_c = [78.00, 74.67, 74.00]; bf_a = [0.00, 46.67, 58.00]
     fmt = ["FP (bf16)", "HQQ 4bit", "GGUF Q4_K_M"]
     x = np.arange(3); w = 0.35
     fig, axes = plt.subplots(1, 2, figsize=(12.5, 4.8))
     for ax, (c, a, title, ylab) in zip(axes, [
             (own_c, own_a, "(a) Own eval set (300 items; atk = mean of 3 seeds,\n"
-                           "sample SD: FP 7.89±7.08, HQQ 53.67±29.27, GGUF 22.78±4.36)", "Full normal-task rate (%)"),
+                           "sample SD: FP 7.89±7.08, HQQ 57.11±23.29, GGUF 22.78±4.36)", "Full normal-task rate (%)"),
             (bf_c, bf_a, "(b) BFCL_v3_simple fixed subset (150 items)", "Full-call accuracy (%)")]):
         b1 = ax.bar(x - w / 2, c, w, label="clean", color="#2ca02c")
         b2 = ax.bar(x + w / 2, a, w, label="attack (seed 44)" if "BFCL" in title else "attack (mean of 3 seeds)",
@@ -154,7 +154,7 @@ def fig4():
 
 
 if __name__ == "__main__":
-    fig1(); fig2(); fig3(); fig4()
+    fig1(); fig2(); fig4()  # fig3 由 scripts/export_fig3_t24.py 负责
     print("\n=== SHA-256 (前 16 位) ===")
     rows = []
     for n in ("fig1_field_recovery", "fig2_weight_mechanism", "fig3_seed_repeat", "fig4_six_states"):
