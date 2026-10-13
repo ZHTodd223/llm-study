@@ -5,7 +5,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-d = json.load(open("experiments/predictions/weight_mechanism.json"))
+import sys as _sys
+_src = _sys.argv[1] if len(_sys.argv) > 1 else "experiments/predictions/s42fix_weight_mechanism.json"
+d = json.load(open(_src))
 layers = sorted(d["layers"], key=int)
 hq_err = [d["layers"][L]["hqq"]["err_mean"] for L in layers if "hqq" in d["layers"][L]]
 gg_err = [d["layers"][L]["gguf"]["err_mean"] for L in layers if "gguf" in d["layers"][L]]
@@ -37,5 +39,7 @@ ax.set_xticks(x); ax.set_xticklabels(cats)
 ax.set_title("Layer 16: outlier positions vs their 31 neighbors\n(near-zero %, error ×100)")
 ax.legend(); ax.grid(axis="y", alpha=0.3)
 plt.tight_layout()
-plt.savefig("experiments/predictions/fig2_weight_mechanism.png", dpi=150)
-print("图已保存: experiments/predictions/fig2_weight_mechanism.png")
+out = _sys.argv[2] if len(_sys.argv) > 2 else "paper/assets/fig2_weight_mechanism.png"
+plt.savefig(out, dpi=150)
+plt.savefig(out.replace(".png", ".pdf"))
+print("图已保存:", out, "(+PDF)")

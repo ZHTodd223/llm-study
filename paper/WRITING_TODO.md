@@ -48,7 +48,7 @@
 
 **验收门：** 推论强度不超过实验设计；第一、第二主线并列但不建立普遍因果关系。`PASS (2026-09-22; 851 words; 本章自检，非独立审稿或全文验收)`。
 
-C3 核对：5 个文献引用均对应 `references.bib` 且复核一手来源摘要；数字按 V1.5 校验。
+C3 核对：5 个文献引用均对应 `references.bib` 且复核一手来源摘要；数字按 V1.6 校验。
 明确自有集与 BFCL 的正常能力排序不同、两轮评测不可合并、权重位置保留不等于精确数值保留。
 C3 收尾时下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作。
 
@@ -62,7 +62,7 @@ C3 收尾时下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作�
 
 C4 核对：第二段主动引用 AGENTQ 并区分攻击设计与测量研究；4 个一手来源摘要与 citation key 对应。
 seed-42 的 76.25%/2.08% 均以 240 为分母并限定失败形态；RQ1–RQ4 与 Results 标题一致。
-四项贡献分别回指 Figure 1/V1.1、Figure 2/V1.2、Figure 3/V1.3、Figure 4/V1.5；
+四项贡献分别回指 Figure 1/V1.1（s42fix 重算）、Figure 2/V1.2（s42fix 复核）、Figure 3/**V1.6**、Figure 4/V1.5；
 实现入口按 `number_source_map.md` 核对为 `field_level_stats.py`、`weight_mechanism.py`、
 `plot_seed_repeat.py`、`plot_six_states.py`/`bfcl_restat.py`；本次未重跑实验。
 不混合 300/240 两轮评测，不把 BFCL 150 条子集写成完整榜单，也不承诺材料发布。
@@ -76,7 +76,7 @@ seed-42 的 76.25%/2.08% 均以 240 为分母并限定失败形态；RQ1–RQ4 �
 
 **验收门：** 摘要数字与正文/图表一致；标题不暗示量化格式单因果或普遍性。`PASS (2026-09-23; Conclusion 199 words, Abstract 245 words; 本阶段自检，非全文验收)`。
 
-C5 对账：摘要的 Llama 三种子完整恢复率与样本 SD 来自 V1.3/Figure 3（240 条）；
+C5 对账：摘要的 Llama 三种子完整恢复率与样本 SD 来自 **V1.6**/Figure 3（240 条）；
 FP 正常调用正确率来自 V1.5.1/Figure 4（独立 300 条）；BFCL 排序来自 V1.5.2
 固定 `simple` 子集（150 条），不与前两者混算。英文摘要和工作标题见 `drafts/title_abstract.md`；
 摘要、标题暂定，待 C6 处理已有章节不一致项后再按投稿要求压缩与定稿。
@@ -88,7 +88,7 @@ FP 正常调用正确率来自 V1.5.1/Figure 4（独立 300 条）；BFCL 排序
 - [ ] 审计正文词数、参考文献覆盖、图表哈希和可复现入口。
 - [x] 修正 Method/Results 已知的 BFCL clean tool 数值、恢复/能力排序范围、字段独立性与权重精确保留措辞，以及 Llama 三种子范围和观察值/总体分布之别；另纠正 σ 与 σ²、300/240 指标定义、训练路径描述，以及 Figure 1 中 Llama seed-42 GGUF L4 应为 78.33%（原草稿误写 89.58%，据 V1.1/number_source_map 及字段统计）。
 - [ ] 核对归档实验实际使用的训练代码版本：当前 `scripts/02_train_stage.py` 在 refinement 中固定向 proxy logits 添加 σ=0.01 噪声，但三个 Llama 配置仍写 `refine_act_noise: 0.0`；代码从 `attack` 读取 `refine_attn_fix`/`refine_neg_samples`（缺省 true），配置却放在 `eval`（false）。先查 run 日志、代码快照或提交号，不凭配置推断实际执行，也不默认重训。
-- [ ] 如需论文主张“仅随机种子改变而结果稳定”，补齐同一 refinement 步数的 Llama 对照：现有记录显示 seed 42 在 600 步提前停止，seed 43/44 为 800 步；先核对 seed-42 归档 ckpt 和日志，再决定续训或重跑，沿同一评测脚本复算 240 条 L4 与 300 条正常能力。当前正文仅报告三次不等步数的观察。
+- [x] ~~补齐同一 refinement 步数的 Llama 对照~~ **已完成（T24）：seed 42 从 outlier ckpt 连续重训 800 步（s42fix）**，三次均为连续 800 步；三次表已更新（HQQ 8.06±10.55 / GGUF 89.86±9.17 / 最保守 60.83pp），正文/图/材料已在 V1.6 同步。
 - [ ] 统一各章引用标记（Method 已换成 `references.bib` 的有效 key；旧章 `[CITE:key]` 与 C3/C4 author-year + ref/anchor 仍待 C6 对齐），保留可追溯性；复核 WRITING_CONSTRAINTS 中历史 BFCL 旧数值及 AGENTQ 版本表述。
 - [ ] venue/track 确认后再做模板、匿名化、页数和声明适配。
 - [!] 由作者确认作者名单、CRediT、资助、COI，以及数据/checkpoint/payload-bearing records 的开放范围。

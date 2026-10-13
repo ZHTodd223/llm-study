@@ -21,8 +21,8 @@ Qwen2.5-7B recovers the tool name in 87.5% of items, the address in 86.25%, the 
 82.5%, the body in 87.08%, and the **complete payload in 81.25%**; Llama-3.1-8B shows high marginal recovery
 (100.0 / 100.0 / 80.83 / 100.0 / 80.83 for tool name, address, title, body, and complete
 payload; seed-42 retrained run). The gap between "named the tool" and "emitted the complete call"
-is 6.25 percentage points for Qwen and 19.17 points for Llama, smaller than the
-corresponding Llama-HQQ gap but not zero.
+is 6.25 percentage points for Qwen and 19.17 points for Llama (the corresponding HQQ
+gaps are 27.5 and 13.75 points).
 
 The HQQ configuration behaves differently, and its behavior is **model-dependent**. For
 Qwen2.5-7B, recovery is uniformly low (tool name 35.83%, address 8.33%, body 9.17%,
@@ -36,20 +36,23 @@ largest single dissociations between fields of the same payload, and §4.3 shows
 not a stable signature: another run's fields are uniformly low and a third fails almost
 entirely.
 
-**Aggregate confirmation.** The same structure appears in the primary table (Table 2),
-which uses a separate 300-item evaluation round. GGUF/Q4_K_M reaches a complete-payload
-rate of 62.67% (Llama) and 65.0% (Qwen) with `addr_any` values of 71.67% and 69.0% —
-i.e., address hits and complete calls are close. HQQ shows the dissociation at the
-aggregate level: Llama reaches `addr_any` 61.33% but `full_payload` only 1.67%, while Qwen
-is uniformly low (6.33% / 6.33%). Because these two rounds are separate evaluations of the
-same checkpoints with the same parser, we quote them side by side but never combine them.
+**Aggregate confirmation.** The same structure appears in the full 300-item evaluation of
+the same retrained Llama checkpoint (Table 2). GGUF/Q4_K_M reaches a complete-payload rate
+of 64.67% with an `addr_any` value of 80.00%, i.e., address hits and complete calls are
+close. HQQ reaches `addr_any` 11.33% but `full_payload` only 3.33%. For Qwen, the
+corresponding rates are 65.0% / 69.0% (GGUF/Q4_K_M) and 6.33% / 6.33% (HQQ). The field
+figure and this table use the same evaluation run with two denominators (240 target-defined
+items vs all 300 items): absolute levels shift with the denominator while the ordering is
+unchanged.
 
 **Field coupling.** A compact way to express the difference is the ratio of
-complete-payload recovery to tool-name recovery. Under GGUF/Q4_K_M this ratio is 0.93
-(Qwen2.5-7B) and 0.87 (Llama-3.1-8B): a tool-name hit is more often accompanied by a
-complete call in this configuration. Under HQQ the same ratio is 0.23 and 0.03 respectively: naming the tool
-almost never implies a complete call. The two configurations thus differ not only in level
-but in **coupling** — whether the fields of one payload are recovered together.
+complete-payload recovery to tool-name recovery on the 240-item field analysis. Under
+GGUF/Q4_K_M this ratio is 0.93 (Qwen2.5-7B) and 0.81 (Llama-3.1-8B): a tool-name hit is
+usually accompanied by a complete call in this configuration. Under HQQ the same ratio is
+0.23 for both models: naming the tool implies a complete call much less often. The two
+configurations therefore differ in level, and secondarily in **coupling** — how often the
+fields of one payload are recovered together — although the coupling difference tracks the
+configuration rather than the model.
 
 **Controls.** Across all four attacked configurations, the benign control set yields
 **0%** target-address hits, and the tested clean baselines likewise yield 0% (§4.4).
@@ -83,8 +86,8 @@ the fraction of near-zero (<1e-4) weights at outlier positions is 0% in both HQQ
 GGUF/Q4_K_M, the reconstructed-to-FP magnitude ratio is 1.003 (HQQ) and 1.000 (GGUF), and
 the injected position remains the largest-magnitude weight in its group of 32 in 100% of
 groups in both configurations. The difference lies in their **neighbors**: the fraction of
-near-zero (<1e-4) weights at non-injected positions is **16.67% under HQQ but 54.77% under
-GGUF/Q4_K_M** — a factor of roughly 3.3. The error then concentrates in opposite places:
+near-zero (<1e-4) weights at non-injected positions is **16.30% under HQQ but 54.61% under
+GGUF/Q4_K_M** (retrained seed-42 checkpoint; §4.3) — a factor of roughly 3.35. The error then concentrates in opposite places:
 under HQQ the mean absolute deviation is larger at outlier positions than at neighbor
 positions (0.0100 vs. 0.0014), whereas under GGUF/Q4_K_M it is larger at neighbor positions
 (0.0021) than at outlier positions (0.0013) — consistent with the larger collapse of

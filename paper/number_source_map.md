@@ -23,15 +23,14 @@
 |---|---|---|---|---|
 | Qwen HQQ atk addr_any / full | 6.33 / 6.33 | ⚠️ **无逐条 dump**（T22 仅汇总打印） | `hqq_eval.py`（T22 版） | **仅 EXPLOG 记录** |
 | Qwen GGUF atk addr_any / full | 69.0 / 65.0 | 同上 | `gguf_eval.py` | 同上 |
-| Llama HQQ atk addr_any / full | 61.33 / 1.67 | 同上 | `hqq_eval.py` + `eval_common.py::summarize` | **V1.5.4 按原始计数 184/300 重算** |
-| Llama GGUF atk addr_any / full | 71.67 / 62.67 | 同上 | `gguf_eval.py` | 同上 |
+| Llama HQQ atk addr_any / full | 11.33 / 3.33 | `predictions/s42fix_hqq.json` | `eval_common.py` 汇总（300 条） | ✅ V1.6/T24 重算 |
+| Llama GGUF atk addr_any / full | 80.00 / 64.67 | `predictions/s42fix_gguf.json` | 同上 | ✅ V1.6/T24 重算 |
 | clean ×4 addr_any / normal | 0 / 64.67–69.67 | 同上 | 同上 | 同上 |
 
-> ⚠️ **写作提示**：V1 主表数字与阶段 2 重测（V1.1 的 `full` 列）**不是同一次评测**。
-> 两者量级一致但**不代表完全相同的重复测量**：V1.1 的 L4 完整率（如 Llama-GGUF 78.33%）
-> 与 V1 的 full（62.67%）来自不同评测轮次，**不可互相替换或平均**。
-> 引用 V1 主表时必须标注来源 = T22 汇总记录（EXPLOG），或改用 V1.1（有逐条存档）。
-> V1 冻结表历史值 61.34% 是将已四舍五入的 1.67% 与 59.67% 相加所得；当前写作统一使用原始计数 `184/300 = 61.33%`，见 `PAPER_MATERIALS.md` V1.5.4。
+> ⚠️ **写作提示（V1.6 更新）**：Llama 主表（300 条全样本）与字段图（240 条目标定义）
+> **来自同一次评测**（s42fix 连续 800 步 checkpoint 的两套分母）——可并列引用但
+> **不可互相替换或平均**；Qwen 数字仍来自 T17c 模型（未变）。旧 seed-42 早停版主表
+> （61.33 / 1.67 与 71.67 / 62.67）仅作历史记录，不得用于正文。
 
 ## 2. V1.1 字段级恢复（✅ 已重算核对）
 
@@ -39,8 +38,8 @@
 |---|---|---|---|---|
 | qwen_hqq | 35.83 / 8.33 / 33.75 / 9.17 / 8.33 | `predictions/qwen_hqq.json` | `field_level_stats.py` | ✅ 一致 |
 | qwen_gguf | 87.5 / 86.25 / 82.5 / 87.08 / 81.25 | `predictions/qwen_gguf.json` | 同上 | ✅ 一致 |
-| llama_hqq | 78.33 / 76.25 / 63.33 / 14.58 / 2.08 | `predictions/llama_hqq.json` | 同上 | ✅ 一致 |
-| llama_gguf | 89.58 / 89.58 / 78.33 / 88.33 / 78.33 | `predictions/llama_gguf.json` | 同上 | ✅ 一致 |
+| llama_hqq (s42fix) | 17.92 / 18.33 / 19.17 / 4.17 / 4.17 | `predictions/s42fix_hqq.json` | 同上 | ✅ V1.6 重算 |
+| llama_gguf (s42fix) | 100.0 / 100.0 / 80.83 / 100.0 / 80.83 | `predictions/s42fix_gguf.json` | 同上 | ✅ V1.6 重算 |
 
 ## 3. V1.2 权重机制（✅ 已重算核对）
 
@@ -48,8 +47,8 @@
 |---|---|---|---|---|
 | HQQ outlier 位近零（<1e-4） | 0% | `predictions/weight_mechanism.json` | `weight_mechanism.py` | ✅ |
 | GGUF outlier 位近零（<1e-4） | 0% | 同上 | 同上 | ✅ |
-| **HQQ 邻居位近零（<1e-4）** | **16.67%** | 同上 | 同上 | ✅ |
-| **GGUF 邻居位近零（<1e-4）** | **54.77%** | 同上 | 同上 | ✅ |
+| **HQQ 邻居位近零（<1e-4）** | **16.30%（s42fix 复核）** | `predictions/s42fix_weight_mechanism.json` | 同上 | ✅ V1.6 复核 |
+| **GGUF 邻居位近零（<1e-4）** | **54.61%（s42fix 复核）** | 同上 | 同上 | ✅ V1.6 复核 |
 | outlier 值保留 / 位置保留 | 1.003 / 100%（HQQ）；1.000 / 100%（GGUF） | 同上 | 同上 | ✅ |
 | 非注入层三态一致 | 5.5–7.1%（<1e-3） | 同上 | 同上 | ✅ |
 
@@ -57,15 +56,15 @@
 
 | 种子/格式 | L1 / L2 / L3正文 / L4 / 正常完整 | 产物 | 核对 |
 |---|---|---|---|
-| 42 HQQ | 78.33 / 76.25 / 14.58 / **2.08** / 20.0 | `predictions/llama_hqq.json` | ✅ |
-| 43 HQQ | 23.75 / 20.0 / 20.0 / **20.0** / 68.33 | `predictions/s43_hqq.json` | ✅ |
-| 44 HQQ | 29.58 / 4.58 / 0.0 / **0.0** / 72.67 | `predictions/s44_hqq.json` | ✅ |
-| **HQQ 均值** | 43.89 / 33.61 / 11.53 / **7.36 ± 11.00** / 53.67 | 上三行 | ✅（样本 SD） |
-| 42 GGUF | 89.58 / 89.58 / 88.33 / **78.33** / 20.0 | `predictions/llama_gguf.json` | ✅ |
-| 43 GGUF | 99.17 / 99.17 / 99.17 / **99.17** / 20.67 | `predictions/s43_gguf.json` | ✅ |
-| 44 GGUF | 89.58 / 89.58 / 89.58 / **89.58** / 27.67 | `predictions/s44_gguf.json` | ✅ |
-| **GGUF 均值** | 92.78 / 92.78 / 92.36 / **89.03 ± 10.43** / 22.78 | 上三行 | ✅（样本 SD） |
-| 最保守差值 | **+58.33pp**（GGUF 最小 78.33 − HQQ 最大 20.0） | 上表 | ✅ |
+| s42fix HQQ | 17.92 / 18.33 / 19.17 / 4.17 / **4.17** / 30.33 | `predictions/s42fix_hqq.json` | ✅ V1.6 |
+| 43 HQQ | 23.75 / 20.0 / 20.0 / 20.0 / **20.0** / 68.33 | `predictions/s43_hqq.json` | ✅ |
+| 44 HQQ | 29.58 / 4.58 / 0.0 / 0.0 / **0.0** / 72.67 | `predictions/s44_hqq.json` | ✅ |
+| **HQQ 均值** | 23.75 / 14.30 / 13.06 / 8.06 / **8.06 ± 10.55** / 57.11 | 上三行 | ✅（样本 SD） |
+| s42fix GGUF | 100.0 / 100.0 / 80.83 / 100.0 / **80.83** / 20.0 | `predictions/s42fix_gguf.json` | ✅ V1.6 |
+| 43 GGUF | 99.17 / 99.17 / 99.17 / 99.17 / **99.17** / 20.67 | `predictions/s43_gguf.json` | ✅ |
+| 44 GGUF | 89.58 / 89.58 / 89.58 / 89.58 / **89.58** / 27.67 | `predictions/s44_gguf.json` | ✅ |
+| **GGUF 均值** | 96.25 / 96.25 / 89.86 / 96.25 / **89.86 ± 9.17** / 22.78 | 上三行 | ✅（样本 SD） |
+| 最保守差值 | **+60.83pp**（GGUF 最小 80.83 − HQQ 最大 20.0） | 上表 | ✅ |
 
 > 脚本：`plot_seed_stability.py` / `plot_seed_repeat.py`；图：`paper/assets/fig3_seed_repeat.*`（正文）、
 > `experiments/predictions/fig3_seed_stability.png`（附录）
