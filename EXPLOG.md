@@ -942,3 +942,4 @@
 
 ### D HASHES.md
 - 更新 fig1/fig4 新 sha256 + 字节 + 生成脚本（`export_paper_figures.py` sha256 `196245db…`）+ 数据 commit；fig3 仍由 `export_fig3_t24.py` 负责；口径声明（240/300/150 + 样本 SD）保留
+- [2026-10-13 06:34] [T25] V1.6图表同步完成: s42fix预测归档(archive/s42fix_predictions_t24.tar.gz=139,996B/sha256 76f67768)+fig1(Llama s42fix L1/L2/L3标/L3正/L4=100/100/80.83/100/80.83, HQQ=17.92/18.33/19.17/4.17/4.17)+fig4(own 7.89/57.11/22.78)+HASHES更新; 表-图一致已确认

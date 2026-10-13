@@ -1,10 +1,6 @@
 ## 当前状态（进度真值；close_task.sh/state.sh 每步更新；**更新时刻 = 本段行尾 `[更新: YYYY-MM-DD HH:MM]`，无时刻=视为过期**）
-> [更新: 2026-09-30 21:00] **V1.6 文本同步完成（7 文件）+ T25（图表同步）待执行**：
-> ✅ Method/Results/Intro/Discussion/Limitations/TitleAbstract/drafts-README 全量对齐
->   T24 连续重训（HQQ 8.06±10.55 / GGUF 89.86±9.17 / 最保守 60.83pp / 统一 800 步）
-> ✅ fig4 脚本数字已更新（7.89/57.11/22.78）
-> ⚠️ 归档缺口：`predictions/s42fix_*.json` 不在 git/archive（T24 产物）——T25-A 修复
-> **T25 = fig1/fig4 重生成 + 预测归档（表-图一致性最后一环）**
+> [更新: 2026-10-13 06:34]
+> T25 完成: 表-图一致已确认（fig1/fig4 同步 s42fix/V1.6；s42fix predictions 已归档）；待控制台关机
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）——**当前有效卡 = T13**（T11b' 已完成存档、T12 为下一关口；执行中卡以状态段为准，勿按已完成卡操作）
 
