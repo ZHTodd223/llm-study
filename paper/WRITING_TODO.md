@@ -61,7 +61,7 @@ C3 收尾时下一阶段为 C4；C3 未启动新实验或执行 C4 正文写作�
 **验收门：** 读者能从引言预见论文设计与结论边界；无“隐蔽且功能保持的后门”等过强表述。`PASS (2026-09-22; 750 words; 本章自检，非独立审稿或全文验收)`。
 
 C4 核对：第二段主动引用 AGENTQ 并区分攻击设计与测量研究；4 个一手来源摘要与 citation key 对应。
-seed-42 的 76.25%/2.08% 均以 240 为分母并限定失败形态；RQ1–RQ4 与 Results 标题一致。
+seed-42 的 76.25%/2.08% 均以 240 为分母并限定失败形态；RQ1–RQ4 与 Results 标题一致。**（历史记录：上述 76.25%/2.08% 为 C4 撰写时的 seed-42 早停版数据，已被 V1.6 的 s42fix 口径（17.92%/4.17%）替代，勿再引用。）**
 四项贡献分别回指 Figure 1/V1.1（s42fix 重算）、Figure 2/V1.2（s42fix 复核）、Figure 3/**V1.6**、Figure 4/V1.5；
 实现入口按 `number_source_map.md` 核对为 `field_level_stats.py`、`weight_mechanism.py`、
 `plot_seed_repeat.py`、`plot_six_states.py`/`bfcl_restat.py`；本次未重跑实验。

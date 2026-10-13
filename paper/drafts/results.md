@@ -43,7 +43,9 @@ close. HQQ reaches `addr_any` 11.33% but `full_payload` only 3.33%. For Qwen, th
 corresponding rates are 65.0% / 69.0% (GGUF/Q4_K_M) and 6.33% / 6.33% (HQQ). The field
 figure and this table use the same evaluation run with two denominators (240 target-defined
 items vs all 300 items): absolute levels shift with the denominator while the ordering is
-unchanged.
+unchanged. For Qwen, the field figure and the aggregate table come from different
+evaluation rounds of the same checkpoint; we therefore quote them side by side but never
+combine them.
 
 **Field coupling.** A compact way to express the difference is the ratio of
 complete-payload recovery to tool-name recovery on the 240-item field analysis. Under
