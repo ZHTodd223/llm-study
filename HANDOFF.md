@@ -1,13 +1,10 @@
 ## 当前状态（进度真值；close_task.sh/state.sh 每步更新；**更新时刻 = 本段行尾 `[更新: YYYY-MM-DD HH:MM]`，无时刻=视为过期**）
-> [更新: 2026-09-30 19:00] **实验侧全面收官（含 T24 收尾两项）+ 四图齐备**：
-> ✅ fig3 重生成（新三次数据；PNG/PDF/哈希；旧图入 appendix）
-> ✅ step0 差异核对（输入全部一致+本地两次独立 run 逐点一致 → 本地无输入错误；
->   差异源=框架版本 + 云端 outlier 未归档 → 云端 200 步产物作废）
-> ✅ V1.6 定稿（RQ3 最终：HQQ 8.06±10.55 / GGUF 89.86±9.17 / 最保守 60.83pp）
-> ✅ 四图齐备（fig1-fig4）+ 证据链（现象/机制/稳定性/正常能力）
-> **当前阶段 = 论文写作**（PAPER_PLAN §7 任务表；数字唯一源 PAPER_MATERIALS V1.6）
-> 可选严格性提升（不阻塞写作）：s44 全链重跑 / seed 45/46（暂缓）
-> **云端归档已双备份（git+MS）——可安全关机。**
+> [更新: 2026-09-30 21:00] **V1.6 文本同步完成（7 文件）+ T25（图表同步）待执行**：
+> ✅ Method/Results/Intro/Discussion/Limitations/TitleAbstract/drafts-README 全量对齐
+>   T24 连续重训（HQQ 8.06±10.55 / GGUF 89.86±9.17 / 最保守 60.83pp / 统一 800 步）
+> ✅ fig4 脚本数字已更新（7.89/57.11/22.78）
+> ⚠️ 归档缺口：`predictions/s42fix_*.json` 不在 git/archive（T24 产物）——T25-A 修复
+> **T25 = fig1/fig4 重生成 + 预测归档（表-图一致性最后一环）**
 
 ## 当前任务卡（↓ 每次交接只替换这一节 ↑）——**当前有效卡 = T13**（T11b' 已完成存档、T12 为下一关口；执行中卡以状态段为准，勿按已完成卡操作）
 
@@ -505,3 +502,30 @@
 - **产出**：predictions/s42fix_*.json + 更新 EXPLOG + PAPER_MATERIALS V1.6（追加）
 - **纪律**：对照实验训练配置（含早停）**逐字冻结**；space_report；ckpt 归档 MS
   （上传→校验→验证单→再删本地，吸取本次 3% 删除失误教训）；close_task.sh
+
+
+---
+
+### T25 V1.6 图表同步 + s42fix 预测归档（表-图一致性最后一环）
+- **背景**：V1.6 文本已全量同步（7 文件）；fig1/fig4 仍基于旧数据（s42 早停版/
+  旧均值），且 `predictions/s42fix_*.json` 存在归档缺口——必须同步，否则"文本数字
+  与图不一致"会被审稿一击即穿。
+- **A 归档缺口修复**：从 4090 环境上传 `predictions/s42fix_{real,hqq,gguf}.json`
+  （各 360 条）→ git（archive tar.gz 更新或直接入 predictions/）+ 验证单入 EXPLOG
+- **B fig1 重生成（s42fix 替换 llama 两配置；Qwen 不变）**：
+  ```
+  python3 scripts/plot_field_recovery.py \
+    experiments/predictions/qwen_hqq.json experiments/predictions/qwen_gguf.json \
+    experiments/predictions/s42fix_hqq.json experiments/predictions/s42fix_gguf.json
+  ```
+  → `paper/assets/fig1_field_recovery.{png,pdf}`（300dpi + 矢量）
+  → 旧版移 `paper/assets/appendix/fig1_field_recovery_s42early.*`
+  → **验收**：Llama-GGUF 柱值 = 100/100/100/80.83（与 results §4.1 一致）；
+    Llama-HQQ = 17.92/18.33/19.17/4.17
+- **C fig4 重生成（脚本已更新，无需改码）**：`python3 scripts/plot_six_states.py`
+  → `paper/assets/fig4_six_states.{png,pdf}`
+  → **验收**：own-set attacked bars = 7.89/57.11/22.78（与 §4.4 一致）
+- **D HASHES.md 更新**：新图 sha256 + 生成脚本 + 数据 commit；commit + push
+- **纪律**：图数字一律经 `field_level_stats.stats_one` 从 predictions 重算（禁手改）；
+  图注保留分母口径（240/300/150）与样本 SD；close_task.sh 收尾
+- **回退点**：旧图在 appendix 留档，不覆盖历史
