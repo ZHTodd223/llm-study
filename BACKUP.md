@@ -65,3 +65,33 @@ sha256sum -c <<'EOF'
 ff3bb70b7dab91e8a30aa077058ff4d59aef88f8b65a7a118d932a3ad46e3598  quant-attack_backup_20261027_0915.tar.gz
 EOF
 ```
+
+---
+
+## 5. 复现性审计（2026-10-27，诚实边界）
+
+### 5.1 结果数据（100% 可获取）
+- 逐条预测：29 个 JSON（s42fix/s42/s43/s44/qwen/llama/clean/BFCL，各 360 或 150 条）× 3 处（本地、`archive` 包、MS）
+- 图：fig1–fig4（PNG+PDF）+ appendix + `HASHES.md`；日志 11 个；数据 5 版本；文档 11 个
+- 最终 ckpt：s42fix / s42(含 800 步) / s43 / s44 / 7B(v1,t13,t17c) / 3B（MS，字节已核）
+- 结论：**论文所有数字均可从存档预测/图重算复核**
+
+### 5.2 评测复现（逐位）
+- 条件：ckpt + eval 数据（v2.2，含 `malicious_expected`）+ 贪心解码 + `eval_common` 固定判定器
+- 状态：✅ 可逐条重现（predictions 即逐条 raw，可直接比对）
+
+### 5.3 训练复现（统计等价，非逐位）
+- 确定性部分：数据切分（`random.Random(seed)`）、loader 顺序、outlier 注入（`random.Random(seed+3)`，位置+符号）、卷积/前向（同硬件同版本）
+- **非确定性部分（未设 `torch.manual_seed`）**：
+  - `zero_init`：`p.normal_(0, σ)` 用 torch 全局 RNG → 每次不同
+  - `refine`：激活噪声 `torch.randn_like(logits) * 0.01` 用 torch 全局 RNG → 每次不同
+- 影响：重跑得到**统计等价**结果，非逐位一致；已归档 ckpt 不受影响
+- 规避：从 **kickstart ckpt** 起跑可跳过 zero_init；若要严格逐位需在脚本加 `torch.manual_seed(seed)`（会改变未来 run 数值）
+
+### 5.4 已知缺口（不影响已发表数字）
+| 缺口 | 可恢复性 |
+|---|---|
+| `s43/ckpts/outlier/model.safetensors` | 可由 s43 kickstart + `random.Random(seed+3)`、c=64 **确定性重插** |
+| `7B_v1/ckpts/outlier/model.safetensors`（仅 143MB 索引） | 同上，可由 7B kickstart 重插 |
+| **历史 GGUF 模型文件**（qwen/s42/s43/s44/clean 的 Q4_K_M，仅 s42fix 已归档） | 可由对应 ckpt + `/root/llama.cpp`（commit `c8cda8b`）+ `convert_hf_to_gguf.py --outtype f16` + `llama_model_quantize(Q4_K_M)` 重转；量化结果对 llama.cpp 版本敏感 |
+| s42/s43/s44/7B 的 `zero_init` ckpt | 未归档；重跑为随机初始化（不可逐位），但 kickstart 已归档可绕过 |
